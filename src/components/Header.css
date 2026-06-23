@@ -1,0 +1,112 @@
+/* --- FLOATING HEADER STYLING --- */
+.floating-header {
+  position: fixed;
+  top: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 85%;
+  max-width: 960px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-color);
+  backdrop-filter: blur(20px) saturate(120%);
+  -webkit-backdrop-filter: blur(20px) saturate(120%);
+  border-radius: 14px;
+  z-index: 10;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.header-inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 1.4rem;
+}
+
+/* Brand Logo */
+.brand-logo {
+  font-family: var(--font-sans);
+  font-size: 1.05rem;
+  font-weight: 500;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.logo-svg {
+  color: #ffffff;
+  animation: rotateLogo 20s linear infinite;
+}
+
+.logo-text {
+  letter-spacing: -0.01em;
+}
+
+/* Navigation Links */
+.minimal-nav {
+  display: flex;
+  margin-left: auto;
+  margin-right: 1.8rem;
+}
+
+.nav-links-list {
+  display: flex;
+  list-style: none;
+  gap: 1.8rem;
+}
+
+.nav-item-link {
+  font-family: var(--font-sans);
+  font-size: 0.88rem;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.55);
+  text-decoration: none;
+  transition: color 0.2s ease;
+  padding: 0.4rem 0;
+}
+
+.nav-item-link:hover {
+  color: #ffffff;
+}
+
+/* CTA Header Button */
+.btn-request {
+  font-family: var(--font-sans);
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #020204;
+  background: #ffffff;
+  border: none;
+  padding: 0.5rem 1.25rem;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.btn-request:hover {
+  opacity: 0.95;
+  transform: scale(1.02);
+}
+
+/* Animations */
+@keyframes rotateLogo {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 640px) {
+  .floating-header {
+    width: 92%;
+    top: 20px;
+  }
+
+  .minimal-nav {
+    display: none;
+  }
+}

@@ -1,5 +1,6 @@
 import { Header } from "./components/Header"
 import Grainient from "./components/Grainient"
+import { HeroContent } from "./components/HeroContent"
 
 function App() {
   return (
@@ -7,9 +8,12 @@ function App() {
       {/* Floating Pill Navigation Header */}
       <Header />
 
-      {/* Fullscreen Moving Gradient Background */}
-      <main className="canvas-wrapper">
+      <main className="hero-container" id="hero-section">
+        {/* Dynamic Background Shader */}
         <Grainient />
+
+        {/* Hero Content Layer */}
+        <HeroContent />
       </main>
     </>
   )

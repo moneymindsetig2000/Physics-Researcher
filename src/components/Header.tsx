@@ -1,3 +1,5 @@
+import './Header.css';
+
 export function Header() {
   return (
     <header className="floating-header" id="main-header">
