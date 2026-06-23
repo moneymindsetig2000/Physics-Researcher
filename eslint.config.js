@@ -21,6 +21,8 @@ export default defineConfig([
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
       'react-hooks/immutability': 'off',
+      '@typescript-eslint/no-unused-expressions': 'off',
+      'no-unused-expressions': 'off',
     },
   },
 ])
