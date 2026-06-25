@@ -1,0 +1,393 @@
+/* --- COMPARISON SECTION CONTAINER --- */
+
+.comparison-section {
+  position: relative;
+  width: 100%;
+  padding: 8rem 2rem;
+  box-sizing: border-box;
+  z-index: 5;
+  background: transparent;
+}
+
+.comparison-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-sizing: border-box;
+}
+
+/* Typography matching Outfit style */
+.comparison-section-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0 0 1rem 0;
+  letter-spacing: -0.03em;
+  text-align: center;
+}
+
+.comparison-section-subtitle {
+  font-family: 'Outfit', sans-serif;
+  font-size: clamp(0.95rem, 2vw, 1.15rem);
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.55);
+  max-width: 600px;
+  text-align: center;
+  margin: 0 0 1.5rem 0;
+  line-height: 1.5;
+}
+
+/* White hint capsule similar to signup button */
+.comparison-hint-capsule {
+  display: inline-flex;
+  align-items: center;
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #020204;
+  background: #ffffff;
+  padding: 0.45rem 1.2rem;
+  border-radius: 9999px;
+  margin-bottom: 3rem;
+  box-shadow: 0 4px 15px rgba(255, 255, 255, 0.1);
+  user-select: none;
+  pointer-events: none;
+}
+
+.hint-icon {
+  margin-right: 6px;
+  vertical-align: middle;
+  display: inline-block;
+}
+
+/* Grid Layout */
+.comparison-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2.5rem;
+  width: 100%;
+  box-sizing: border-box;
+  justify-items: center;
+}
+
+/* --- TAILWIND REPLACEMENTS & CUSTOM TRANSITIONS --- */
+
+.relative {
+  position: relative;
+}
+
+.absolute {
+  position: absolute;
+}
+
+.inset-0 {
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+}
+
+.w-full {
+  width: 100%;
+}
+
+.h-full {
+  height: 100%;
+}
+
+.overflow-hidden {
+  overflow: hidden;
+}
+
+/* Main animated card component */
+.group\/animated-card {
+  position: relative;
+  width: 356px;
+  overflow: hidden;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background-color: #050507;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.4s ease, box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform;
+}
+
+.group\/animated-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.6), 0 0 25px rgba(139, 92, 246, 0.12);
+}
+
+/* Card Visual Wrapper - STRICT DIRECT CHILD ONLY to avoid nested divs */
+.group\/animated-card > div:first-child {
+  height: 180px;
+  width: 356px;
+  overflow: hidden;
+}
+
+/* Card Body padding and layout - STRICT DIRECT CHILD ONLY to avoid nested divs */
+.flex-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.group\/animated-card > div:last-child {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 1.25rem;
+  background: rgba(0, 0, 0, 0.15);
+}
+
+/* Typography styles */
+.text-lg {
+  font-family: 'Outfit', sans-serif;
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: #ffffff;
+  margin: 0;
+}
+
+.text-sm {
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.875rem;
+  font-weight: 400;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.5);
+  margin: 0;
+}
+
+/* Visual3 Wrapper inside CardVisual */
+.relative.h-\[180px\].w-\[356px\].overflow-hidden.rounded-t-lg {
+  position: relative;
+  height: 180px;
+  width: 356px;
+  overflow: hidden;
+  border-top-left-radius: 0.5rem;
+  border-top-right-radius: 0.5rem;
+}
+
+/* Hover overlay z-20 */
+.z-20 {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+}
+
+/* GridLayer bg styles */
+.z-\[4\] {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  height: 100%;
+  width: 100%;
+  background-color: transparent;
+  background-image: 
+    linear-gradient(to right, var(--grid-color, rgba(255, 255, 255, 0.06)) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid-color, rgba(255, 255, 255, 0.06)) 1px, transparent 1px);
+  background-size: 20px 20px;
+  background-position: center;
+  opacity: 0.7;
+  mask-image: radial-gradient(ellipse 50% 50% at 50% 50%, #000 60%, transparent 100%);
+  -webkit-mask-image: radial-gradient(ellipse 50% 50% at 50% 50%, #000 60%, transparent 100%);
+  pointer-events: none;
+}
+
+/* Ellipse Gradient */
+.z-\[5\] {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  height: 100%;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+/* Layer 1 Badges (+15.2%, +18.7%) */
+.z-\[8\].top-4.left-4 {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  pointer-events: none;
+}
+
+.z-\[8\].top-4.left-4 > div {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background-color: rgba(255, 255, 255, 0.06);
+  padding: 3px 6px;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  transition: opacity 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  box-sizing: border-box;
+}
+
+.z-\[8\].top-4.left-4 > div span {
+  font-family: 'Outfit', sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  color: #ffffff;
+  margin-left: 4px;
+  line-height: 1;
+  display: inline-block;
+}
+
+.z-\[8\].top-4.left-4 > div div {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  display: block;
+}
+
+/* Layer 2 info panel sliding up */
+.z-\[7\] {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 1rem;
+  transform: translateY(100%);
+  background: transparent;
+  transition: transform 500ms cubic-bezier(0.6, 0.6, 0, 1);
+  pointer-events: none;
+}
+
+.group\/animated-card:hover .z-\[7\] {
+  transform: translateY(0);
+}
+
+.z-\[7\] > div {
+  border-radius: 0.375rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background-color: rgba(0, 0, 0, 0.65);
+  padding: 0.5rem;
+  opacity: 0;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: opacity 500ms cubic-bezier(0.6, 0, 1);
+}
+
+.z-\[7\] > div > div {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.z-\[7\] > div > div > div {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.z-\[7\] p {
+  font-size: 11px;
+}
+
+.z-\[7\] p.text-white {
+  color: #ffffff;
+  font-weight: 500;
+}
+
+.z-\[7\] p.text-neutral-400 {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.group\/animated-card:hover .z-\[7\] > div {
+  opacity: 1;
+}
+
+/* Layer 3 Linear Gradient Overlay */
+.z-\[6\] {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transform: translateY(100%);
+  transition: all 500ms cubic-bezier(0.6, 0.6, 0, 1);
+  pointer-events: none;
+}
+
+.group\/animated-card:hover .z-\[6\] {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+/* Layer 4 Bar animation scaling & colors */
+.z-\[8\].h-\[180px\].w-\[356px\] {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  display: flex;
+  height: 100%;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  transition: transform 500ms cubic-bezier(0.6, 0.6, 0, 1);
+  pointer-events: none;
+}
+
+/* Faint colors when not hovered, brighter when hovered */
+.text-neutral-800\/10 {
+  color: rgba(255, 255, 255, 0.15) !important;
+}
+
+.dark\:text-white\/15 {
+  color: rgba(255, 255, 255, 0.25) !important;
+}
+
+.group\/animated-card:hover .z-\[8\].h-\[180px\].w-\[356px\] {
+  transform: scale(1.15);
+}
+
+.group\/animated-card svg rect {
+  transition: all 500ms cubic-bezier(0.6, 0.6, 0, 1);
+}
+
+/* Responsiveness mirroring Features grid */
+@media (max-width: 1140px) {
+  .comparison-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 2rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .comparison-section {
+    padding: 6rem 1.5rem;
+  }
+
+  .comparison-section-subtitle {
+    margin-bottom: 3.5rem;
+  }
+}
+
+@media (max-width: 680px) {
+  .comparison-grid {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+}

@@ -1,6 +1,8 @@
 import { Header } from "./components/Header"
 import { HeroContent } from "./components/HeroContent"
 import { Features } from "./components/Features"
+import { Comparison } from "./components/Comparison"
+import { WorkspacePreview } from "./components/WorkspacePreview"
 
 function App() {
   return (
@@ -17,6 +19,12 @@ function App() {
 
         {/* Features Section */}
         <Features />
+
+        {/* Comparison/Benchmarks Section */}
+        <Comparison />
+
+        {/* Research Workspace Preview Section */}
+        <WorkspacePreview />
       </div>
     </>
   )
