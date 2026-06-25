@@ -31,12 +31,18 @@ body {
   overflow: hidden;
 }
 
-/* Canvas Wrapper containing OGL Grainient */
+/* Canvas Wrapper containing background shaders */
 .canvas-wrapper {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   z-index: 0;
+  pointer-events: none;
+}
+
+/* Ensure the fixed WebGL background canvas stays behind the content */
+canvas.fixed {
+  z-index: 1;
   pointer-events: none;
 }

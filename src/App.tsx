@@ -1,5 +1,4 @@
 import { Header } from "./components/Header"
-import Grainient from "./components/Grainient"
 import { HeroContent } from "./components/HeroContent"
 
 function App() {
@@ -8,11 +7,8 @@ function App() {
       {/* Floating Pill Navigation Header */}
       <Header />
 
-      <main className="hero-container" id="hero-section">
-        {/* Dynamic Background Shader */}
-        <Grainient />
-
-        {/* Hero Content Layer */}
+      {/* Hero Section containing background and layout */}
+      <main id="hero-section">
         <HeroContent />
       </main>
     </>

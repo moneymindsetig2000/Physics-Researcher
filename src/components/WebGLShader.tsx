@@ -1,8 +1,9 @@
+"use client"
+
 import { useEffect, useRef } from "react"
 import * as THREE from "three"
-import './HeroContent.css'
 
-export function HeroContent() {
+export function WebGLShader() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const sceneRef = useRef<{
     scene: THREE.Scene | null
@@ -184,40 +185,9 @@ export function HeroContent() {
   }, [])
 
   return (
-    <div className="hero-container">
-      {/* Background WebGL Shader Canvas */}
-      <canvas
-        ref={canvasRef}
-        className="hero-bg-canvas"
-      />
-
-      {/* Hero Content Layer */}
-      <div className="hero-center-content">
-        <div className="hero-frame-outer" id="hero-frame-outer">
-          <div className="hero-frame-inner" id="hero-frame-inner">
-            {/* Main Title */}
-            <h1 className="hero-title" id="hero-title">
-              The Research Partner<br />Built For Physics.
-            </h1>
-
-            {/* Subtitle / Description */}
-            <p className="hero-description" id="hero-description">
-              AI-powered research discovery, paper understanding, literature exploration, and scientific insight generation designed specifically for physics researchers.
-            </p>
-
-            {/* Status Pill */}
-            <div className="status-pill" id="status-available">
-              <span className="status-dot-green" />
-              <span className="status-text-green">Available for New Projects</span>
-            </div>
-
-            {/* Liquid Glass Button */}
-            <button className="btn-liquid-glass" id="btn-lets-go">
-              Let's Go
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <canvas
+      ref={canvasRef}
+      className="fixed top-0 left-0 w-full h-full block"
+    />
   )
 }
