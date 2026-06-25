@@ -27,7 +27,7 @@ export function HeroContent() {
     let isVisible = true
     let isPageVisible = !document.hidden
 
-    let resizeId: number
+    let resizeId: number | null = null
 
     const vertexShader = `
       attribute vec3 position;
@@ -63,14 +63,17 @@ export function HeroContent() {
 
     const initScene = () => {
       refs.scene = new THREE.Scene()
-      refs.renderer = new THREE.WebGLRenderer({ 
-        canvas, 
-        depth: false, 
-        stencil: false, 
-        powerPreference: "high-performance" 
+      refs.renderer = new THREE.WebGLRenderer({
+        canvas,
+        alpha: false,
+        antialias: false,
+        depth: false,
+        stencil: false,
+        powerPreference: "high-performance",
+        failIfMajorPerformanceCaveat: false
       })
-      refs.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-      refs.renderer.setClearColor(new THREE.Color(0x000000))
+      refs.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5))
+      refs.renderer.setClearColor(new THREE.Color(0x000000), 1)
 
       refs.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, -1)
 
@@ -82,16 +85,16 @@ export function HeroContent() {
         distortion: { value: 0.05 },
       }
 
-      const position = [
+      const position = new Float32Array([
         -1.0, -1.0, 0.0,
-         1.0, -1.0, 0.0,
-        -1.0,  1.0, 0.0,
-         1.0, -1.0, 0.0,
-        -1.0,  1.0, 0.0,
-         1.0,  1.0, 0.0,
-      ]
+        1.0, -1.0, 0.0,
+        -1.0, 1.0, 0.0,
+        1.0, -1.0, 0.0,
+        -1.0, 1.0, 0.0,
+        1.0, 1.0, 0.0,
+      ])
 
-      const positions = new THREE.BufferAttribute(new Float32Array(position), 3)
+      const positions = new THREE.BufferAttribute(position, 3)
       const geometry = new THREE.BufferGeometry()
       geometry.setAttribute("position", positions)
 
@@ -100,6 +103,8 @@ export function HeroContent() {
         fragmentShader,
         uniforms: refs.uniforms,
         side: THREE.DoubleSide,
+        depthTest: false,
+        depthWrite: false,
       })
 
       refs.mesh = new THREE.Mesh(geometry, material)
@@ -141,12 +146,14 @@ export function HeroContent() {
         const height = window.innerHeight
         refs.renderer.setSize(width, height, false)
         refs.uniforms.resolution.value = [width, height]
+        resizeId = null
       })
     }
 
     initScene()
     tryStart()
-    window.addEventListener("resize", handleResize)
+
+    window.addEventListener("resize", handleResize, { passive: true })
 
     // IntersectionObserver to pause rendering when component is not in view
     const observer = new IntersectionObserver(
@@ -183,6 +190,10 @@ export function HeroContent() {
     }
   }, [])
 
+  const handleScrollToFeatures = () => {
+    document.getElementById("features")?.scrollIntoView({ behavior: "smooth" })
+  }
+
   return (
     <div className="hero-container">
       {/* Background WebGL Shader Canvas */}
@@ -212,10 +223,18 @@ export function HeroContent() {
             </div>
 
             {/* Liquid Glass Button */}
-            <button className="btn-liquid-glass" id="btn-lets-go">
+            <button className="btn-liquid-glass" id="btn-lets-go" onClick={handleScrollToFeatures}>
               Let's Go
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* Premium Scroll Down Indicator */}
+      <div className="scroll-indicator" id="scroll-indicator" onClick={handleScrollToFeatures}>
+        <span className="scroll-text">Explore Platform</span>
+        <div className="scroll-mouse">
+          <span className="scroll-wheel" />
         </div>
       </div>
     </div>

@@ -46,3 +46,15 @@ canvas.fixed {
   z-index: 1;
   pointer-events: none;
 }
+
+/* Scroll container enabling main content flow over fixed background */
+.scroll-content-flow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  z-index: 5;
+}

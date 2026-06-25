@@ -28,7 +28,7 @@ export function WebGLShader() {
     let isVisible = true
     let isPageVisible = !document.hidden
 
-    let resizeId: number
+    let resizeId: number | null = null
 
     const vertexShader = `
       attribute vec3 position;
@@ -64,14 +64,17 @@ export function WebGLShader() {
 
     const initScene = () => {
       refs.scene = new THREE.Scene()
-      refs.renderer = new THREE.WebGLRenderer({ 
-        canvas, 
-        depth: false, 
-        stencil: false, 
-        powerPreference: "high-performance" 
+      refs.renderer = new THREE.WebGLRenderer({
+        canvas,
+        alpha: false,
+        antialias: false,
+        depth: false,
+        stencil: false,
+        powerPreference: "high-performance",
+        failIfMajorPerformanceCaveat: false
       })
       refs.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-      refs.renderer.setClearColor(new THREE.Color(0x000000))
+      refs.renderer.setClearColor(new THREE.Color(0x000000), 1)
 
       refs.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, -1)
 
@@ -83,16 +86,16 @@ export function WebGLShader() {
         distortion: { value: 0.05 },
       }
 
-      const position = [
+      const position = new Float32Array([
         -1.0, -1.0, 0.0,
-         1.0, -1.0, 0.0,
-        -1.0,  1.0, 0.0,
-         1.0, -1.0, 0.0,
-        -1.0,  1.0, 0.0,
-         1.0,  1.0, 0.0,
-      ]
+        1.0, -1.0, 0.0,
+        -1.0, 1.0, 0.0,
+        1.0, -1.0, 0.0,
+        -1.0, 1.0, 0.0,
+        1.0, 1.0, 0.0,
+      ])
 
-      const positions = new THREE.BufferAttribute(new Float32Array(position), 3)
+      const positions = new THREE.BufferAttribute(position, 3)
       const geometry = new THREE.BufferGeometry()
       geometry.setAttribute("position", positions)
 
@@ -101,6 +104,8 @@ export function WebGLShader() {
         fragmentShader,
         uniforms: refs.uniforms,
         side: THREE.DoubleSide,
+        depthTest: false,
+        depthWrite: false,
       })
 
       refs.mesh = new THREE.Mesh(geometry, material)
@@ -142,14 +147,15 @@ export function WebGLShader() {
         const height = window.innerHeight
         refs.renderer.setSize(width, height, false)
         refs.uniforms.resolution.value = [width, height]
+        resizeId = null
       })
     }
 
     initScene()
     tryStart()
-    window.addEventListener("resize", handleResize)
 
-    // IntersectionObserver to pause rendering when component is not in view
+    window.addEventListener("resize", handleResize, { passive: true })
+
     const observer = new IntersectionObserver(
       ([entry]) => {
         isVisible = entry.isIntersecting
@@ -159,7 +165,6 @@ export function WebGLShader() {
     )
     observer.observe(canvas)
 
-    // Visibility listener to pause rendering when tab is inactive
     const handleVisibilityChange = () => {
       isPageVisible = !document.hidden
       isPageVisible ? tryStart() : tryStop()
@@ -188,6 +193,7 @@ export function WebGLShader() {
     <canvas
       ref={canvasRef}
       className="fixed top-0 left-0 w-full h-full block"
+      style={{ transform: 'translateZ(0)', willChange: 'auto' }}
     />
   )
 }

@@ -14,7 +14,7 @@
 
 /* Background Canvas positioning */
 .hero-bg-canvas {
-  position: absolute;
+  position: fixed;
   top: 0;
   left: 0;
   width: 100%;
@@ -22,6 +22,8 @@
   z-index: 1;
   pointer-events: none;
   display: block;
+  transform: translateZ(0);
+  will-change: contents;
 }
 
 .hero-center-content {
@@ -40,7 +42,7 @@
 /* Outer sharp frame box matching the target image */
 .hero-frame-outer {
   border: 1px solid rgba(255, 255, 255, 0.08);
-  padding: 8px; /* Gap between outer and inner borders */
+  padding: 8px;
   max-width: 960px;
   width: 100%;
   box-sizing: border-box;
@@ -138,13 +140,15 @@
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: 
+  box-shadow:
     inset 0 1px 1px rgba(255, 255, 255, 0.25),
     inset 0 -1px 1px rgba(0, 0, 0, 0.3),
     0 10px 25px rgba(0, 0, 0, 0.5);
   overflow: hidden;
   opacity: 0;
   animation: fadeInUp 1.2s cubic-bezier(0.16, 1, 0.3, 1) 0.8s forwards;
+  transform: translateZ(0);
+  will-change: transform;
 }
 
 .btn-liquid-glass::before {
@@ -159,30 +163,33 @@
 }
 
 .btn-liquid-glass:hover {
-  transform: translateY(-2px);
+  transform: translateY(-2px) translateZ(0);
   background: rgba(255, 255, 255, 0.08);
   border-color: rgba(255, 255, 255, 0.3);
-  box-shadow: 
+  box-shadow:
     inset 0 1px 2px rgba(255, 255, 255, 0.4),
     0 15px 30px rgba(0, 0, 0, 0.6),
     0 0 15px rgba(255, 255, 255, 0.05);
 }
 
 .btn-liquid-glass:active {
-  transform: translateY(0);
+  transform: translateY(0) translateZ(0);
   background: rgba(255, 255, 255, 0.03);
-  box-shadow: 
+  box-shadow:
     inset 0 1px 1px rgba(255, 255, 255, 0.1),
     0 5px 15px rgba(0, 0, 0, 0.4);
 }
 
 /* Animations */
 @keyframes statusPulse {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: scale(1);
     opacity: 1;
     box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
   }
+
   50% {
     transform: scale(1.15);
     opacity: 0.85;
@@ -195,6 +202,7 @@
     opacity: 0;
     transform: scale(0.98);
   }
+
   to {
     opacity: 1;
     transform: scale(1);
@@ -206,6 +214,7 @@
     opacity: 0;
     transform: translateY(20px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -223,10 +232,101 @@
   .hero-frame-outer {
     width: 95%;
   }
+
   .hero-frame-inner {
     padding: 3rem 1.5rem;
   }
+
   .status-pill {
     margin-bottom: 2rem;
+  }
+}
+
+/* Scroll Down Indicator - GPU OPTIMIZED */
+.scroll-indicator {
+  position: absolute;
+  bottom: 2.5rem;
+  left: 50%;
+  transform: translate3d(-50%, 0, 0);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.8rem;
+  cursor: pointer;
+  z-index: 12;
+  opacity: 0;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  animation: fadeInUpScroll 1.2s cubic-bezier(0.16, 1, 0.3, 1) 1.2s forwards;
+}
+
+.scroll-text {
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: rgba(255, 255, 255, 0.35);
+  transition: color 0.3s ease;
+}
+
+.scroll-mouse {
+  width: 22px;
+  height: 36px;
+  border: 1.5px solid rgba(255, 255, 255, 0.2);
+  border-radius: 20px;
+  position: relative;
+  transition: border-color 0.3s ease;
+  transform: translateZ(0);
+}
+
+.scroll-wheel {
+  width: 3px;
+  height: 7px;
+  background-color: rgba(255, 255, 255, 0.5);
+  border-radius: 2px;
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  transform: translate3d(-50%, 0, 0);
+  will-change: transform, opacity;
+  animation: scrollWheelAnim 2s infinite cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.scroll-indicator:hover .scroll-text {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.scroll-indicator:hover .scroll-mouse {
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+@keyframes scrollWheelAnim {
+  0% {
+    transform: translate3d(-50%, 0, 0) scaleY(1);
+    opacity: 1;
+  }
+  30% {
+    transform: translate3d(-50%, 8px, 0) scaleY(0.4);
+    opacity: 0;
+  }
+  31% {
+    transform: translate3d(-50%, 0, 0) scaleY(1);
+    opacity: 0;
+  }
+  100% {
+    transform: translate3d(-50%, 0, 0) scaleY(1);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeInUpScroll {
+  from {
+    opacity: 0;
+    transform: translate3d(-50%, 20px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(-50%, 0, 0);
   }
 }

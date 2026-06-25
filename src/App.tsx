@@ -1,5 +1,6 @@
 import { Header } from "./components/Header"
 import { HeroContent } from "./components/HeroContent"
+import { Features } from "./components/Features"
 
 function App() {
   return (
@@ -7,10 +8,16 @@ function App() {
       {/* Floating Pill Navigation Header */}
       <Header />
 
-      {/* Hero Section containing background and layout */}
-      <main id="hero-section">
-        <HeroContent />
-      </main>
+      {/* Scrollable content container */}
+      <div className="scroll-content-flow">
+        {/* Hero Section containing background and layout */}
+        <main id="hero-section">
+          <HeroContent />
+        </main>
+
+        {/* Features Section */}
+        <Features />
+      </div>
     </>
   )
 }
