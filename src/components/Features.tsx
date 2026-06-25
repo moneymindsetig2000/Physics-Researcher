@@ -36,7 +36,7 @@ export function Features() {
   ]
 
   useEffect(() => {
-    const cards = document.querySelectorAll('.border-glow-card')
+    const cards = document.querySelectorAll('#features .border-glow-card')
     const rectCache = new Map()
     let resizeTimeout: number
 

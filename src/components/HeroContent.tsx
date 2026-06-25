@@ -62,59 +62,64 @@ export function HeroContent() {
     `
 
     const initScene = () => {
-      refs.scene = new THREE.Scene()
-      refs.renderer = new THREE.WebGLRenderer({
-        canvas,
-        alpha: false,
-        antialias: false,
-        depth: false,
-        stencil: false,
-        powerPreference: "high-performance",
-        failIfMajorPerformanceCaveat: false
-      })
-      refs.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5))
-      refs.renderer.setClearColor(new THREE.Color(0x000000), 1)
+      try {
+        refs.scene = new THREE.Scene()
+        refs.renderer = new THREE.WebGLRenderer({
+          canvas,
+          alpha: false,
+          antialias: false,
+          depth: false,
+          stencil: false,
+          powerPreference: "high-performance",
+          failIfMajorPerformanceCaveat: false
+        })
+        refs.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5))
+        refs.renderer.setClearColor(new THREE.Color(0x000000), 1)
 
-      refs.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, -1)
+        refs.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, -1)
 
-      refs.uniforms = {
-        resolution: { value: [window.innerWidth, window.innerHeight] },
-        time: { value: 0.0 },
-        xScale: { value: 1.0 },
-        yScale: { value: 0.5 },
-        distortion: { value: 0.05 },
+        refs.uniforms = {
+          resolution: { value: [window.innerWidth, window.innerHeight] },
+          time: { value: 0.0 },
+          xScale: { value: 1.0 },
+          yScale: { value: 0.5 },
+          distortion: { value: 0.05 },
+        }
+
+        const position = new Float32Array([
+          -1.0, -1.0, 0.0,
+          1.0, -1.0, 0.0,
+          -1.0, 1.0, 0.0,
+          1.0, -1.0, 0.0,
+          -1.0, 1.0, 0.0,
+          1.0, 1.0, 0.0,
+        ])
+
+        const positions = new THREE.BufferAttribute(position, 3)
+        const geometry = new THREE.BufferGeometry()
+        geometry.setAttribute("position", positions)
+
+        const material = new THREE.RawShaderMaterial({
+          vertexShader,
+          fragmentShader,
+          uniforms: refs.uniforms,
+          side: THREE.DoubleSide,
+          depthTest: false,
+          depthWrite: false,
+        })
+
+        refs.mesh = new THREE.Mesh(geometry, material)
+        refs.scene.add(refs.mesh)
+
+        handleResize()
+      } catch (error) {
+        console.warn("HeroContent WebGL initialization failed:", error)
+        refs.renderer = null
       }
-
-      const position = new Float32Array([
-        -1.0, -1.0, 0.0,
-        1.0, -1.0, 0.0,
-        -1.0, 1.0, 0.0,
-        1.0, -1.0, 0.0,
-        -1.0, 1.0, 0.0,
-        1.0, 1.0, 0.0,
-      ])
-
-      const positions = new THREE.BufferAttribute(position, 3)
-      const geometry = new THREE.BufferGeometry()
-      geometry.setAttribute("position", positions)
-
-      const material = new THREE.RawShaderMaterial({
-        vertexShader,
-        fragmentShader,
-        uniforms: refs.uniforms,
-        side: THREE.DoubleSide,
-        depthTest: false,
-        depthWrite: false,
-      })
-
-      refs.mesh = new THREE.Mesh(geometry, material)
-      refs.scene.add(refs.mesh)
-
-      handleResize()
     }
 
     const animate = () => {
-      if (!isVisible || !isPageVisible) {
+      if (!isVisible || !isPageVisible || !refs.renderer) {
         refs.animationId = null
         return
       }
@@ -126,7 +131,7 @@ export function HeroContent() {
     }
 
     const tryStart = () => {
-      if (isVisible && isPageVisible && !refs.animationId) {
+      if (isVisible && isPageVisible && !refs.animationId && refs.renderer) {
         refs.animationId = requestAnimationFrame(animate)
       }
     }
@@ -149,6 +154,41 @@ export function HeroContent() {
         resizeId = null
       })
     }
+
+    const handleContextLost = (event: Event) => {
+      event.preventDefault()
+      console.warn("HeroContent: WebGL context lost. Cleaning up resources.")
+      tryStop()
+
+      if (refs.mesh) {
+        refs.scene?.remove(refs.mesh)
+        refs.mesh.geometry.dispose()
+        if (refs.mesh.material instanceof THREE.Material) {
+          refs.mesh.material.dispose()
+        }
+        refs.mesh = null
+      }
+      if (refs.renderer) {
+        try {
+          refs.renderer.dispose()
+        } catch (e) {
+          console.warn("Error disposing renderer during context loss:", e)
+        }
+        refs.renderer = null
+      }
+      refs.scene = null;
+      refs.camera = null;
+      refs.uniforms = null;
+    }
+
+    const handleContextRestored = () => {
+      console.log("HeroContent: WebGL context restored. Re-initializing scene.")
+      initScene()
+      tryStart()
+    }
+
+    canvas.addEventListener("webglcontextlost", handleContextLost, false)
+    canvas.addEventListener("webglcontextrestored", handleContextRestored, false)
 
     initScene()
     tryStart()
@@ -179,6 +219,9 @@ export function HeroContent() {
       document.removeEventListener("visibilitychange", handleVisibilityChange)
       observer.disconnect()
 
+      canvas.removeEventListener("webglcontextlost", handleContextLost)
+      canvas.removeEventListener("webglcontextrestored", handleContextRestored)
+
       if (refs.mesh) {
         refs.scene?.remove(refs.mesh)
         refs.mesh.geometry.dispose()
@@ -186,7 +229,19 @@ export function HeroContent() {
           refs.mesh.material.dispose()
         }
       }
-      refs.renderer?.dispose()
+      if (refs.renderer) {
+        try {
+          refs.renderer.dispose()
+        } catch (e) {
+          console.warn("Error during renderer disposal:", e)
+        }
+      }
+
+      refs.scene = null
+      refs.camera = null
+      refs.renderer = null
+      refs.mesh = null
+      refs.uniforms = null
     }
   }, [])
 

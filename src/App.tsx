@@ -3,6 +3,10 @@ import { HeroContent } from "./components/HeroContent"
 import { Features } from "./components/Features"
 import { Comparison } from "./components/Comparison"
 import { WorkspacePreview } from "./components/WorkspacePreview"
+import { ResearchSources } from "./components/ResearchSources"
+import { DesignedForPhysics } from "./components/DesignedForPhysics"
+import { CTASection } from "./components/CTASection"
+import { Footer } from "./components/Footer"
 
 function App() {
   return (
@@ -25,6 +29,18 @@ function App() {
 
         {/* Research Workspace Preview Section */}
         <WorkspacePreview />
+
+        {/* Research Sources Section */}
+        <ResearchSources />
+
+        {/* Designed For Physics Research Section */}
+        <DesignedForPhysics />
+
+        {/* Final CTA Section */}
+        <CTASection />
+
+        {/* Footer Section */}
+        <Footer />
       </div>
     </>
   )
