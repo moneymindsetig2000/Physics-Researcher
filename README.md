@@ -79,7 +79,9 @@ The platform prioritizes repository-based searching, pulling paper data and meta
 │   ├── favicon.svg                # Atom-styled SVG favicon with light/dark theme support
 │   └── icons.svg                  # SVG icon definitions
 ├── src/
-│   ├── components/                # React UI components and their corresponding stylesheets
+│   ├── components/                # React UI components
+│   │   ├── landingpage/           # Section-specific subfolders (header, hero, features, etc.)
+│   │   └── WebGLShader.tsx        # Unused shader component
 │   ├── App.tsx                    # Main app setup and landing page layout
 │   ├── index.css                  # Core design system tokens and global styles
 │   └── main.tsx                   # React application entrypoint

@@ -1,12 +1,12 @@
-import { Header } from "./components/Header"
-import { HeroContent } from "./components/HeroContent"
-import { Features } from "./components/Features"
-import { Comparison } from "./components/Comparison"
-import { WorkspacePreview } from "./components/WorkspacePreview"
-import { ResearchSources } from "./components/ResearchSources"
-import { DesignedForPhysics } from "./components/DesignedForPhysics"
-import { CTASection } from "./components/CTASection"
-import { Footer } from "./components/Footer"
+import { Header } from "./components/landingpage/header/Header"
+import { HeroContent } from "./components/landingpage/hero/HeroContent"
+import { Features } from "./components/landingpage/features/Features"
+import { Comparison } from "./components/landingpage/comparison/Comparison"
+import { WorkspacePreview } from "./components/landingpage/workspacepreview/WorkspacePreview"
+import { ResearchSources } from "./components/landingpage/researchsources/ResearchSources"
+import { DesignedForPhysics } from "./components/landingpage/designedforphysics/DesignedForPhysics"
+import { CTASection } from "./components/landingpage/ctasection/CTASection"
+import { Footer } from "./components/landingpage/footer/Footer"
 
 function App() {
   return (
