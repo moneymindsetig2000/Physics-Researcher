@@ -80,6 +80,7 @@ The platform prioritizes repository-based searching, pulling paper data and meta
 │   └── icons.svg                  # SVG icon definitions
 ├── src/
 │   ├── components/                # React UI components
+│   │   ├── chatpage/              # Chat workspace sections (sidebar, chat, rightsidebar)
 │   │   ├── landingpage/           # Section-specific subfolders (header, hero, features, etc.)
 │   │   └── WebGLShader.tsx        # Unused shader component
 │   ├── App.tsx                    # Main app setup and landing page layout

@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react"
 import { Header } from "./components/landingpage/header/Header"
 import { HeroContent } from "./components/landingpage/hero/HeroContent"
 import { Features } from "./components/landingpage/features/Features"
@@ -7,8 +8,22 @@ import { ResearchSources } from "./components/landingpage/researchsources/Resear
 import { DesignedForPhysics } from "./components/landingpage/designedforphysics/DesignedForPhysics"
 import { CTASection } from "./components/landingpage/ctasection/CTASection"
 import { Footer } from "./components/landingpage/footer/Footer"
+import { ChatPage } from "./components/chatpage/ChatPage"
 
 function App() {
+  const [isChat, setIsChat] = useState(window.location.hash === "#chat")
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      setIsChat(window.location.hash === "#chat")
+    }
+    window.addEventListener("hashchange", handleHashChange)
+    return () => window.removeEventListener("hashchange", handleHashChange)
+  }, [])
+
+  if (isChat) {
+    return <ChatPage />
+  }
   return (
     <>
       {/* Floating Pill Navigation Header */}
