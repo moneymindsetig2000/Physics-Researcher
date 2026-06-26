@@ -32,6 +32,18 @@
 
 .brand-icon-svg {
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.15));
+  animation: logo-spin 10s linear infinite;
+  transform-origin: center;
+  color: #ffffff;
+}
+
+@keyframes logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .brand-title {

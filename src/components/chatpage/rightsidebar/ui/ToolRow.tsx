@@ -1,8 +1,10 @@
+import React from 'react';
+
 interface ToolRowProps {
   id: string;
   name: string;
   desc: string;
-  icon: string;
+  icon: React.ReactNode;
   isOn: boolean;
   onToggle: () => void;
 }

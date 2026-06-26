@@ -11,7 +11,7 @@ export function PanelTabs({ activeTab, onTabChange }: PanelTabsProps) {
         id="tab-tools"
         onClick={() => onTabChange('tools')}
       >
-        Tools
+        Memory
       </button>
       <button 
         className={`panel-tab-btn ${activeTab === 'files' ? 'active' : ''}`} 

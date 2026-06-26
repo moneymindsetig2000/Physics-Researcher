@@ -2,8 +2,8 @@ export function WorkspaceHeader() {
   return (
     <header className="workspace-header" id="chat-header">
       <div className="header-text-group">
-        <h1 className="workspace-title">Chat with Command R+</h1>
-        <p className="workspace-desc">A conversational tool for web searches, citing sources, research, drafting, debugging, and more.</p>
+        <h1 className="workspace-title">Chat with Gemma 4 31B</h1>
+        <p className="workspace-desc">A specialized companion for physics paper discovery, literature review, and equation understanding.</p>
       </div>
       <div className="header-actions">
         {/* GitHub Icon */}
