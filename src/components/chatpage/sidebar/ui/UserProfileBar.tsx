@@ -23,6 +23,7 @@ export function UserProfileBar() {
           <circle cx="19" cy="12" r="1" />
           <circle cx="5" cy="12" r="1" />
         </svg>
+        <span className="tooltip tooltip-above">Manage user account preferences and configurations.</span>
       </button>
     </div>
   );

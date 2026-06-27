@@ -9,7 +9,7 @@
   box-sizing: border-box;
   transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), margin-right 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   will-change: transform, margin-right;
-  overflow: hidden; /* Collapse button hides off-screen with the sidebar */
+  overflow: visible;
 }
 
 .supernova-right-sidebar.collapsed {
@@ -49,7 +49,7 @@
     inset 0 1px 1px rgba(255, 255, 255, 0.25),
     inset 0 -1px 1px rgba(0, 0, 0, 0.3),
     0 10px 25px rgba(0, 0, 0, 0.3);
-  overflow: hidden;
+  overflow: visible;
   transform: translateZ(0);
   will-change: transform;
   z-index: 10001; /* Ensure collapse button stays on top of elements */
@@ -62,6 +62,7 @@
   left: 0;
   width: 100%;
   height: 50%;
+  border-radius: inherit;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0) 100%);
   pointer-events: none;
 }
@@ -210,6 +211,7 @@
 }
 
 .add-memory-btn {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center; /* Center the text + icon */

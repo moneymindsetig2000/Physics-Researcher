@@ -30,6 +30,7 @@ export function RightPanelHeader({ isCollapsed, onToggleCollapse }: RightPanelHe
           <line x1="5" y1="12" x2="19" y2="12" />
           <polyline points="12 5 19 12 12 19" />
         </svg>
+        <span className="tooltip">{isCollapsed ? 'Expand memory panel to view saved research notes.' : 'Collapse memory panel to maximize main workspace.'}</span>
       </button>
       <div className="panel-title-group">
         <div className="panel-title-icon">
@@ -45,3 +46,4 @@ export function RightPanelHeader({ isCollapsed, onToggleCollapse }: RightPanelHe
     </header>
   );
 }
+

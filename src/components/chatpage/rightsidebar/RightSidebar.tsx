@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { RightPanelHeader } from './ui/RightPanelHeader';
 import { PanelTabs } from './ui/PanelTabs';
 import './RightSidebar.css';
@@ -16,11 +17,30 @@ export function RightSidebar({ isCollapsed, onToggleCollapse }: RightSidebarProp
   const [editText, setEditText] = useState('');
   const [clickCoords, setClickCoords] = useState<{ x: number, y: number } | null>(null);
   const [isClosing, setIsClosing] = useState(false);
+  const [isAddingMemory, setIsAddingMemory] = useState(false);
+  const [newMemoryText, setNewMemoryText] = useState('');
 
-  const handleAddMemory = () => {
-    const text = window.prompt("Enter new research memory:");
-    if (text && text.trim()) {
-      setMemories([...memories, text.trim()]);
+  const handleAddMemory = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = rect.left + rect.width / 2;
+    const y = rect.top + rect.height / 2;
+    setClickCoords({ x, y });
+    setNewMemoryText('');
+    setIsAddingMemory(true);
+  };
+
+  const handleCloseAddModal = () => {
+    setIsClosing(true);
+    setTimeout(() => {
+      setIsAddingMemory(false);
+      setIsClosing(false);
+    }, 280); // matches CSS close animation duration (280ms)
+  };
+
+  const handleSaveNewMemory = () => {
+    if (newMemoryText.trim()) {
+      setMemories([...memories, newMemoryText.trim()]);
+      handleCloseAddModal();
     }
   };
 
@@ -88,6 +108,7 @@ export function RightSidebar({ isCollapsed, onToggleCollapse }: RightSidebarProp
                   <line x1="5" y1="12" x2="19" y2="12" />
                 </svg>
                 <span>Add Memory</span>
+                <span className="tooltip">Save a new research memory context to active workspace.</span>
               </button>
             </div>
 
@@ -119,7 +140,7 @@ export function RightSidebar({ isCollapsed, onToggleCollapse }: RightSidebarProp
         </div>
       </div>
 
-      {selectedMemoryIndex !== null && (
+      {selectedMemoryIndex !== null && createPortal(
         <div 
           className={`memory-modal-overlay ${isClosing ? 'closing' : ''}`} 
           onClick={handleCloseModal}
@@ -180,7 +201,56 @@ export function RightSidebar({ isCollapsed, onToggleCollapse }: RightSidebarProp
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
+      )}
+
+      {isAddingMemory && createPortal(
+        <div 
+          className={`memory-modal-overlay ${isClosing ? 'closing' : ''}`} 
+          onClick={handleCloseAddModal}
+          style={{
+            '--click-x': clickCoords ? `${clickCoords.x}px` : '50%',
+            '--click-y': clickCoords ? `${clickCoords.y}px` : '50%'
+          } as React.CSSProperties}
+        >
+          <div 
+            className="memory-modal-card" 
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Top Right Close Button */}
+            <button className="modal-close-btn" onClick={handleCloseAddModal} aria-label="Close modal">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+
+            <div className="modal-content-area">
+              <span className="modal-label">Research Memory</span>
+              <div className="modal-memory-dashed-box">
+                <textarea 
+                  className="modal-textarea"
+                  value={newMemoryText}
+                  onChange={(e) => setNewMemoryText(e.target.value)}
+                  placeholder="Enter new research memory..."
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            {/* Bottom Right Actions */}
+            <div className="modal-actions-row">
+              <button className="flat-action-btn secondary" onClick={handleCloseAddModal}>
+                Cancel
+              </button>
+              <button className="flat-action-btn primary" onClick={handleSaveNewMemory}>
+                Save
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </aside>
   );

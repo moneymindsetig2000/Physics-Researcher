@@ -66,6 +66,7 @@ export function ComposerInput({
             <line x1="12" y1="5" x2="12" y2="19" />
             <line x1="5" y1="12" x2="19" y2="12" />
           </svg>
+          <span className="tooltip tooltip-above tooltip-left-align">Toggle files attachment panel and model answering mode presets.</span>
         </button>
         <div className={`composer-dropdown-content ${isOpen ? 'open' : ''}`} id="composer-dropdown">
           <button 
@@ -149,6 +150,7 @@ export function ComposerInput({
           <line x1="12" y1="19" x2="12" y2="5" />
           <polyline points="5 12 12 5 19 12" />
         </svg>
+        <span className="tooltip tooltip-above tooltip-right-align">Send query to the physics intelligence companion.</span>
       </button>
     </div>
   );

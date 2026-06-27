@@ -10,7 +10,7 @@
   box-sizing: border-box;
   transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), margin-left 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   will-change: transform, margin-left;
-  overflow: hidden; /* Collapse elements off-screen cleanly */
+  overflow: visible;
 }
 
 .supernova-sidebar.collapsed {
@@ -210,6 +210,7 @@
 }
 
 .user-options-btn {
+  position: relative;
   margin-left: auto;
   background: none;
   border: none;

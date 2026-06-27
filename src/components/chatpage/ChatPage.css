@@ -12,3 +12,158 @@
   inset: 0;
   z-index: 999999; /* Ensure it overlays everything when active */
 }
+
+/* ─── Global Tooltip System ─────────────────────────────────────────────── */
+.tooltip {
+  position: absolute;
+  top: calc(100% + 9px);
+  left: 50%;
+  transform: translateX(-50%) translateY(-5px);
+  background: rgba(12, 12, 16, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.88);
+  font-family: var(--font-sans);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  width: 180px;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.35;
+  padding: 6px 10px;
+  border-radius: 6px;
+  pointer-events: none;
+  opacity: 0;
+  transition:
+    opacity 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 9999999;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+  will-change: opacity, transform;
+}
+
+/* Arrow pointing up */
+.tooltip::before {
+  content: '';
+  position: absolute;
+  top: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 8px;
+  height: 8px;
+  background: rgba(12, 12, 16, 0.96);
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  transform: translateX(-50%) rotate(45deg);
+}
+
+/* Tooltip that appears ABOVE (for bottom-positioned buttons) */
+.tooltip.tooltip-above {
+  top: auto;
+  bottom: calc(100% + 9px);
+  transform: translateX(-50%) translateY(5px);
+}
+
+.tooltip.tooltip-above::before {
+  top: auto;
+  bottom: -5px;
+  border-left: none;
+  border-top: none;
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  transform: translateX(-50%) rotate(45deg);
+}
+
+button:hover > .tooltip,
+div:hover > .tooltip {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+button:hover > .tooltip.tooltip-above,
+div:hover > .tooltip.tooltip-above {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ─── Pane Stacking & Z-Index Coordination ───────────────────────────────── */
+.supernova-sidebar {
+  position: relative !important;
+  z-index: 2 !important;
+}
+.supernova-chat-workspace {
+  position: relative !important;
+  z-index: 2 !important;
+}
+.supernova-right-sidebar {
+  position: relative !important;
+  z-index: 2 !important;
+}
+
+/* Elevate the hovered pane to render all tooltips/collapses above adjacent panes */
+.supernova-sidebar:hover,
+.supernova-sidebar:focus-within {
+  z-index: 9999 !important;
+}
+.supernova-chat-workspace:hover,
+.supernova-chat-workspace:focus-within {
+  z-index: 9999 !important;
+}
+.supernova-right-sidebar:hover,
+.supernova-right-sidebar:focus-within {
+  z-index: 9999 !important;
+}
+
+/* ─── Tooltip Alignment Overrides for Edge Buttons ───────────────────────── */
+.tooltip.tooltip-left-align {
+  left: 0;
+  transform: translateY(-5px);
+}
+.tooltip.tooltip-left-align::before {
+  left: 18px;
+  transform: translateX(-50%) rotate(45deg);
+}
+button:hover > .tooltip.tooltip-left-align,
+div:hover > .tooltip.tooltip-left-align {
+  transform: translateY(0);
+}
+
+.tooltip.tooltip-above.tooltip-left-align {
+  top: auto;
+  bottom: calc(100% + 9px);
+  left: 0;
+  transform: translateY(5px);
+}
+button:hover > .tooltip.tooltip-above.tooltip-left-align,
+div:hover > .tooltip.tooltip-above.tooltip-left-align {
+  transform: translateY(0);
+}
+
+.tooltip.tooltip-right-align {
+  left: auto;
+  right: 0;
+  transform: translateY(-5px);
+}
+.tooltip.tooltip-right-align::before {
+  left: auto;
+  right: 18px;
+  transform: translateX(50%) rotate(45deg);
+}
+button:hover > .tooltip.tooltip-right-align,
+div:hover > .tooltip.tooltip-right-align {
+  transform: translateY(0);
+}
+
+.tooltip.tooltip-above.tooltip-right-align {
+  top: auto;
+  bottom: calc(100% + 9px);
+  left: auto;
+  right: 0;
+  transform: translateY(5px);
+}
+button:hover > .tooltip.tooltip-above.tooltip-right-align,
+div:hover > .tooltip.tooltip-above.tooltip-right-align {
+  transform: translateY(0);
+}
