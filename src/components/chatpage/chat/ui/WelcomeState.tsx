@@ -1,6 +1,10 @@
 import { PromptCardsGrid } from './PromptCardsGrid';
 
-export function WelcomeState() {
+interface WelcomeStateProps {
+  onSelectPrompt: (promptText: string) => void;
+}
+
+export function WelcomeState({ onSelectPrompt }: WelcomeStateProps) {
   return (
     <div className="welcome-state">
       {/* Large wizard hat icon */}
@@ -14,7 +18,7 @@ export function WelcomeState() {
       <p className="welcome-subtitle">Uses academic repositories like arXiv and INSPIRE to analyze physics papers with citations.</p>
 
       {/* Grid of Action Cards */}
-      <PromptCardsGrid />
+      <PromptCardsGrid onSelectPrompt={onSelectPrompt} />
     </div>
   );
 }
