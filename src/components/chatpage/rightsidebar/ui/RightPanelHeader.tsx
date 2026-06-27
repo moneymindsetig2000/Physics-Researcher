@@ -1,8 +1,32 @@
-export function RightPanelHeader() {
+interface RightPanelHeaderProps {
+  isCollapsed: boolean;
+  onToggleCollapse: () => void;
+}
+
+export function RightPanelHeader({ isCollapsed, onToggleCollapse }: RightPanelHeaderProps) {
   return (
     <header className="right-panel-header">
-      <button className="panel-collapse-btn" id="btn-collapse-panel" aria-label="Collapse Panel">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <button 
+        className="panel-collapse-btn" 
+        id="btn-collapse-panel" 
+        aria-label={isCollapsed ? "Expand Panel" : "Collapse Panel"}
+        onClick={onToggleCollapse}
+      >
+        <svg 
+          viewBox="0 0 24 24" 
+          width="18" 
+          height="18" 
+          fill="none" 
+          stroke="currentColor" 
+          strokeWidth="2.5" 
+          strokeLinecap="round" 
+          strokeLinejoin="round"
+          style={{
+            transform: isCollapsed ? 'rotate(180deg) translate3d(0, 0, 0)' : 'translate3d(0, 0, 0)',
+            transition: 'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
+            willChange: 'transform'
+          }}
+        >
           <line x1="5" y1="12" x2="19" y2="12" />
           <polyline points="12 5 19 12 12 19" />
         </svg>

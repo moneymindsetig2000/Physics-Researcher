@@ -8,6 +8,15 @@
   flex-direction: column;
   padding: 1.25rem;
   box-sizing: border-box;
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), margin-left 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, margin-left;
+  overflow: hidden; /* Collapse elements off-screen cleanly */
+}
+
+.supernova-sidebar.collapsed {
+  transform: translate3d(-250px, 0, 0);
+  margin-left: -250px;
+  border-right-color: transparent;
 }
 
 /* Brand Header */

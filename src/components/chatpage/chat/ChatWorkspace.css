@@ -6,6 +6,8 @@
   flex-direction: column;
   box-sizing: border-box;
   position: relative;
+  transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1), flex-basis 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: width, flex-basis;
 }
 
 /* Workspace Header */
@@ -121,6 +123,7 @@
   max-width: 800px;
   width: 100%;
   margin: 0 auto;
+  contain: layout; /* Ground fix: isolates style/layout shifts of chat message stream during transition */
 }
 
 /* Welcome State (centered layout) */

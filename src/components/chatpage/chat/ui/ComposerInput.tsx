@@ -4,21 +4,12 @@ interface ComposerInputProps {
   message: string;
   onChange: (message: string) => void;
   onSend: () => void;
-  toolsState: {
-    pythonRunner: boolean;
-    calculator: boolean;
-    imageUploader: boolean;
-    [key: string]: boolean;
-  };
-  onToggleTool: (toolKey: string) => void;
 }
 
 export function ComposerInput({ 
   message, 
   onChange, 
-  onSend, 
-  toolsState, 
-  onToggleTool 
+  onSend
 }: ComposerInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [isOpen, setIsOpen] = useState(false);
@@ -77,26 +68,6 @@ export function ComposerInput({
           </svg>
         </button>
         <div className={`composer-dropdown-content ${isOpen ? 'open' : ''}`} id="composer-dropdown">
-          <button 
-            className={`composer-dropdown-item ${toolsState.imageUploader ? 'selected' : ''}`} 
-            id="item-image-uploader" 
-            onClick={() => { onToggleTool('imageUploader'); setIsOpen(false); }}
-          >
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-              <circle cx="8.5" cy="8.5" r="1.5" />
-              <polyline points="21 15 16 10 5 21" />
-            </svg>
-            <span>Image Uploader</span>
-            {toolsState.imageUploader && (
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 'auto', color: '#10b981' }}>
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-            )}
-          </button>
-          
-          <div className="composer-dropdown-divider"></div>
-
           <button 
             className={`composer-dropdown-item ${answeringMode === 'fast' ? 'selected' : ''}`} 
             id="item-mode-fast" 

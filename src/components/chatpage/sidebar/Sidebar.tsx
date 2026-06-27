@@ -4,7 +4,12 @@ import { SidebarNavItem } from './ui/SidebarNavItem';
 import { UserProfileBar } from './ui/UserProfileBar';
 import './Sidebar.css';
 
-export function Sidebar() {
+interface SidebarProps {
+  isCollapsed: boolean;
+  onToggleCollapse: () => void;
+}
+
+export function Sidebar({ isCollapsed, onToggleCollapse }: SidebarProps) {
   const [activeItem, setActiveItem] = useState<string>('chat');
 
   const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, item: string) => {
@@ -15,9 +20,9 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="supernova-sidebar" id="sidebar-container">
+    <aside className={`supernova-sidebar ${isCollapsed ? 'collapsed' : ''}`} id="sidebar-container">
       {/* Brand Header */}
-      <BrandHeader />
+      <BrandHeader onToggleCollapse={onToggleCollapse} />
 
       {/* Navigation Group: Features */}
       <div className="nav-group" id="group-features">

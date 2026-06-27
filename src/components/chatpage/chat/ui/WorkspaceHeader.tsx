@@ -1,9 +1,53 @@
-export function WorkspaceHeader() {
+interface WorkspaceHeaderProps {
+  isRightSidebarCollapsed: boolean;
+  onToggleRightSidebar: () => void;
+  isLeftSidebarCollapsed: boolean;
+  onToggleLeftSidebar: () => void;
+}
+
+export function WorkspaceHeader({ 
+  isRightSidebarCollapsed, 
+  onToggleRightSidebar,
+  isLeftSidebarCollapsed,
+  onToggleLeftSidebar
+}: WorkspaceHeaderProps) {
   return (
     <header className="workspace-header" id="chat-header">
-      <div className="header-text-group">
-        <h1 className="workspace-title">Chat with Gemma 4 31B</h1>
-        <p className="workspace-desc">A specialized companion for physics paper discovery, literature review, and equation understanding.</p>
+      <div className="header-title-container" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        {isLeftSidebarCollapsed && (
+          <button 
+            className="icon-btn panel-collapse-btn" 
+            id="btn-toggle-left-sidebar" 
+            aria-label="Expand Sidebar"
+            onClick={onToggleLeftSidebar}
+            style={{
+              padding: '0.35rem',
+              borderRadius: '6px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginRight: '0.25rem'
+            }}
+          >
+            <svg 
+              viewBox="0 0 24 24" 
+              width="18" 
+              height="18" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="2.5" 
+              strokeLinecap="round" 
+              strokeLinejoin="round"
+            >
+              <line x1="5" y1="12" x2="19" y2="12" />
+              <polyline points="12 5 19 12 12 19" />
+            </svg>
+          </button>
+        )}
+        <div className="header-text-group">
+          <h1 className="workspace-title">Chat with Gemma 4 31B</h1>
+          <p className="workspace-desc">A specialized companion for physics paper discovery, literature review, and equation understanding.</p>
+        </div>
       </div>
       <div className="header-actions">
         {/* GitHub Icon */}
@@ -21,6 +65,41 @@ export function WorkspaceHeader() {
             <line x1="15" y1="3" x2="15" y2="21" />
           </svg>
         </button>
+        {/* Right Sidebar Collapse/Expand Button */}
+        {isRightSidebarCollapsed && (
+          <button 
+            className="icon-btn panel-collapse-btn" 
+            id="btn-toggle-right-sidebar" 
+            aria-label="Expand Sidebar"
+            onClick={onToggleRightSidebar}
+            style={{
+              padding: '0.35rem',
+              borderRadius: '6px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            <svg 
+              viewBox="0 0 24 24" 
+              width="18" 
+              height="18" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="2.5" 
+              strokeLinecap="round" 
+              strokeLinejoin="round"
+              style={{
+                transform: 'rotate(180deg) translate3d(0,0,0)',
+                transition: 'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
+                willChange: 'transform'
+              }}
+            >
+              <line x1="5" y1="12" x2="19" y2="12" />
+              <polyline points="12 5 19 12 12 19" />
+            </svg>
+          </button>
+        )}
       </div>
     </header>
   );

@@ -4,22 +4,18 @@ import { PanelTabs } from './ui/PanelTabs';
 import './RightSidebar.css';
 
 interface RightSidebarProps {
-  toolsState: {
-    pythonRunner: boolean;
-    calculator: boolean;
-    webSearch: boolean;
-    urlScraper: boolean;
-    imageUploader: boolean;
-  };
-  onToggleTool: (toolKey: string) => void;
+  isCollapsed: boolean;
+  onToggleCollapse: () => void;
 }
 
-export function RightSidebar({ toolsState: _toolsState, onToggleTool: _onToggleTool }: RightSidebarProps) {
+export function RightSidebar({ isCollapsed, onToggleCollapse }: RightSidebarProps) {
   const [activeTab, setActiveTab] = useState<'tools' | 'files'>('tools');
   const [memories, setMemories] = useState<string[]>([]);
   const [selectedMemoryIndex, setSelectedMemoryIndex] = useState<number | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState('');
+  const [clickCoords, setClickCoords] = useState<{ x: number, y: number } | null>(null);
+  const [isClosing, setIsClosing] = useState(false);
 
   const handleAddMemory = () => {
     const text = window.prompt("Enter new research memory:");
@@ -32,15 +28,22 @@ export function RightSidebar({ toolsState: _toolsState, onToggleTool: _onToggleT
     setMemories(memories.filter((_, i) => i !== index));
   };
 
-  const handleOpenModal = (index: number) => {
+  const handleOpenModal = (index: number, e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = rect.left + rect.width / 2;
+    const y = rect.top + rect.height / 2;
+    setClickCoords({ x, y });
     setSelectedMemoryIndex(index);
     setEditText(memories[index]);
     setIsEditing(false);
   };
 
   const handleCloseModal = () => {
-    setSelectedMemoryIndex(null);
-    setIsEditing(false);
+    setIsClosing(true);
+    setTimeout(() => {
+      setSelectedMemoryIndex(null);
+      setIsClosing(false);
+    }, 280); // matches CSS close animation duration (280ms)
   };
 
   const handleSaveEdit = () => {
@@ -60,17 +63,20 @@ export function RightSidebar({ toolsState: _toolsState, onToggleTool: _onToggleT
   };
 
   return (
-    <aside className="supernova-right-sidebar" id="right-panel-container">
+    <aside className={`supernova-right-sidebar ${isCollapsed ? 'collapsed' : ''}`} id="right-panel-container">
       {/* Panel Header */}
-      <RightPanelHeader />
+      <RightPanelHeader isCollapsed={isCollapsed} onToggleCollapse={onToggleCollapse} />
 
       {/* Tabs */}
       <PanelTabs activeTab={activeTab} onTabChange={setActiveTab} />
 
       {/* Tab Content */}
       <div className="panel-content">
-        {activeTab === 'tools' ? (
-          <div className="tools-tab-content">
+        <div 
+          className="panel-content-slider" 
+          style={{ transform: `translate3d(${activeTab === 'tools' ? '0%' : '-50%'}, 0, 0)` }}
+        >
+          <div className="slide-pane tools-tab-content">
             <p className="tools-description">
               Research Memory is the collection of memories of what the AI has remembered.
             </p>
@@ -99,22 +105,29 @@ export function RightSidebar({ toolsState: _toolsState, onToggleTool: _onToggleT
             ) : (
               <div className="memory-list">
                 {memories.map((memory, index) => (
-                  <div key={index} className="memory-item" onClick={() => handleOpenModal(index)}>
+                  <div key={index} className="memory-item" onClick={(e) => handleOpenModal(index, e)}>
                     <p className="memory-text">{memory}</p>
                   </div>
                 ))}
               </div>
             )}
           </div>
-        ) : (
-          <div className="files-tab-content">
+
+          <div className="slide-pane files-tab-content">
             <p className="files-empty-text">No uploaded files yet. Attach files in the composer to view them here.</p>
           </div>
-        )}
+        </div>
       </div>
 
       {selectedMemoryIndex !== null && (
-        <div className="memory-modal-overlay" onClick={handleCloseModal}>
+        <div 
+          className={`memory-modal-overlay ${isClosing ? 'closing' : ''}`} 
+          onClick={handleCloseModal}
+          style={{
+            '--click-x': clickCoords ? `${clickCoords.x}px` : '50%',
+            '--click-y': clickCoords ? `${clickCoords.y}px` : '50%'
+          } as React.CSSProperties}
+        >
           <div 
             className="memory-modal-card" 
             onClick={(e) => e.stopPropagation()}
@@ -128,18 +141,20 @@ export function RightSidebar({ toolsState: _toolsState, onToggleTool: _onToggleT
             </button>
 
             <div className="modal-content-area">
-              <span className="modal-label">Research Insight</span>
-              {isEditing ? (
-                <textarea 
-                  className="modal-textarea"
-                  value={editText}
-                  onChange={(e) => setEditText(e.target.value)}
-                  placeholder="Edit research memory..."
-                  autoFocus
-                />
-              ) : (
-                <p className="modal-memory-text">{memories[selectedMemoryIndex]}</p>
-              )}
+              <span className="modal-label">Research Memory</span>
+              <div className="modal-memory-dashed-box">
+                {isEditing ? (
+                  <textarea 
+                    className="modal-textarea"
+                    value={editText}
+                    onChange={(e) => setEditText(e.target.value)}
+                    placeholder="Edit research memory..."
+                    autoFocus
+                  />
+                ) : (
+                  <p className="modal-memory-text">{memories[selectedMemoryIndex]}</p>
+                )}
+              </div>
             </div>
 
             {/* Bottom Right Actions */}
