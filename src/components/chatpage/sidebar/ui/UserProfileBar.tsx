@@ -1,4 +1,8 @@
-export function UserProfileBar() {
+interface UserProfileBarProps {
+  onOpenSettings: () => void;
+}
+
+export function UserProfileBar({ onOpenSettings }: UserProfileBarProps) {
   return (
     <div className="user-profile-bar" id="sidebar-user">
       <div className="user-avatar-wrapper">
@@ -17,7 +21,12 @@ export function UserProfileBar() {
         </svg>
       </div>
       <span className="user-name">Raraimoon</span>
-      <button className="user-options-btn" id="btn-user-options" aria-label="User Options">
+      <button 
+        className="user-options-btn" 
+        id="btn-user-options" 
+        aria-label="User Options"
+        onClick={onOpenSettings}
+      >
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5">
           <circle cx="12" cy="12" r="1" />
           <circle cx="19" cy="12" r="1" />
