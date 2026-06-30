@@ -3,7 +3,7 @@ import React, { useRef, useEffect, useState } from 'react';
 interface ComposerInputProps {
   message: string;
   onChange: (message: string) => void;
-  onSend: () => void;
+  onSend: (mode: 'fast' | 'thinking' | 'deep') => void;
 }
 
 export function ComposerInput({ 
@@ -49,7 +49,7 @@ export function ComposerInput({
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      onSend();
+      onSend(answeringMode);
     }
   };
 
@@ -144,7 +144,7 @@ export function ComposerInput({
         className="composer-send-btn" 
         id="btn-send-message" 
         aria-label="Send Message"
-        onClick={onSend}
+        onClick={() => onSend(answeringMode)}
       >
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="send-icon-svg">
           <line x1="12" y1="19" x2="12" y2="5" />

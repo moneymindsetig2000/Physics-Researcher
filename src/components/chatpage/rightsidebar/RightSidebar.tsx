@@ -2,16 +2,24 @@ import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { RightPanelHeader } from './ui/RightPanelHeader';
 import { PanelTabs } from './ui/PanelTabs';
+import type { MemoryRecord } from '../../../utils/ai/types';
+import { embedText } from '../../../utils/ai/gemini';
 import './RightSidebar.css';
 
 interface RightSidebarProps {
   isCollapsed: boolean;
   onToggleCollapse: () => void;
+  memories: MemoryRecord[];
+  onUpdateMemories: (updated: MemoryRecord[]) => void;
 }
 
-export function RightSidebar({ isCollapsed, onToggleCollapse }: RightSidebarProps) {
+export function RightSidebar({ 
+  isCollapsed, 
+  onToggleCollapse, 
+  memories, 
+  onUpdateMemories 
+}: RightSidebarProps) {
   const [activeTab, setActiveTab] = useState<'tools' | 'files'>('tools');
-  const [memories, setMemories] = useState<string[]>([]);
   const [selectedMemoryIndex, setSelectedMemoryIndex] = useState<number | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState('');
@@ -19,6 +27,7 @@ export function RightSidebar({ isCollapsed, onToggleCollapse }: RightSidebarProp
   const [isClosing, setIsClosing] = useState(false);
   const [isAddingMemory, setIsAddingMemory] = useState(false);
   const [newMemoryText, setNewMemoryText] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   const handleAddMemory = (e: React.MouseEvent<HTMLButtonElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -37,15 +46,34 @@ export function RightSidebar({ isCollapsed, onToggleCollapse }: RightSidebarProp
     }, 280); // matches CSS close animation duration (280ms)
   };
 
-  const handleSaveNewMemory = () => {
-    if (newMemoryText.trim()) {
-      setMemories([...memories, newMemoryText.trim()]);
+  const handleSaveNewMemory = async () => {
+    if (!newMemoryText.trim() || isSaving) return;
+    setIsSaving(true);
+    try {
+      const vector = await embedText(newMemoryText.trim(), "RETRIEVAL_DOCUMENT");
+      const randomSuffix = Math.random().toString(36).substring(2, 10);
+      const newRecord: MemoryRecord = {
+        id: "mem_manual_" + randomSuffix,
+        title: newMemoryText.trim().length > 30 ? newMemoryText.trim().slice(0, 30) + "..." : newMemoryText.trim(),
+        description: "Manually logged memory.",
+        category: "User Preference",
+        memory: newMemoryText.trim(),
+        importance: 5,
+        createdAt: Date.now(),
+        embedding: vector
+      };
+      onUpdateMemories([...memories, newRecord]);
       handleCloseAddModal();
+    } catch (err) {
+      console.error("Failed to generate embedding for manual memory:", err);
+      alert("Embedding generation failed. Check API key or connection.");
+    } finally {
+      setIsSaving(false);
     }
   };
 
   const handleDeleteMemory = (index: number) => {
-    setMemories(memories.filter((_, i) => i !== index));
+    onUpdateMemories(memories.filter((_, i) => i !== index));
   };
 
   const handleOpenModal = (index: number, e: React.MouseEvent<HTMLDivElement>) => {
@@ -54,7 +82,7 @@ export function RightSidebar({ isCollapsed, onToggleCollapse }: RightSidebarProp
     const y = rect.top + rect.height / 2;
     setClickCoords({ x, y });
     setSelectedMemoryIndex(index);
-    setEditText(memories[index]);
+    setEditText(memories[index]?.memory || '');
     setIsEditing(false);
   };
 
@@ -66,12 +94,26 @@ export function RightSidebar({ isCollapsed, onToggleCollapse }: RightSidebarProp
     }, 280); // matches CSS close animation duration (280ms)
   };
 
-  const handleSaveEdit = () => {
-    if (selectedMemoryIndex !== null && editText.trim()) {
-      const updated = [...memories];
-      updated[selectedMemoryIndex] = editText.trim();
-      setMemories(updated);
-      setIsEditing(false);
+  const handleSaveEdit = async () => {
+    if (selectedMemoryIndex !== null && editText.trim() && !isSaving) {
+      setIsSaving(true);
+      try {
+        const vector = await embedText(editText.trim(), "RETRIEVAL_DOCUMENT");
+        const updated = [...memories];
+        updated[selectedMemoryIndex] = {
+          ...updated[selectedMemoryIndex],
+          title: editText.trim().length > 30 ? editText.trim().slice(0, 30) + "..." : editText.trim(),
+          memory: editText.trim(),
+          embedding: vector
+        };
+        onUpdateMemories(updated);
+        setIsEditing(false);
+      } catch (err) {
+        console.error("Failed to generate embedding for updated memory:", err);
+        alert("Embedding generation failed. Check API key or connection.");
+      } finally {
+        setIsSaving(false);
+      }
     }
   };
 
@@ -126,8 +168,8 @@ export function RightSidebar({ isCollapsed, onToggleCollapse }: RightSidebarProp
             ) : (
               <div className="memory-list">
                 {memories.map((memory, index) => (
-                  <div key={index} className="memory-item" onClick={(e) => handleOpenModal(index, e)}>
-                    <p className="memory-text">{memory}</p>
+                  <div key={memory.id} className="memory-item" onClick={(e) => handleOpenModal(index, e)}>
+                    <p className="memory-text">{memory.memory}</p>
                   </div>
                 ))}
               </div>
@@ -170,10 +212,11 @@ export function RightSidebar({ isCollapsed, onToggleCollapse }: RightSidebarProp
                     value={editText}
                     onChange={(e) => setEditText(e.target.value)}
                     placeholder="Edit research memory..."
+                    disabled={isSaving}
                     autoFocus
                   />
                 ) : (
-                  <p className="modal-memory-text">{memories[selectedMemoryIndex]}</p>
+                  <p className="modal-memory-text">{memories[selectedMemoryIndex]?.memory}</p>
                 )}
               </div>
             </div>
@@ -182,11 +225,11 @@ export function RightSidebar({ isCollapsed, onToggleCollapse }: RightSidebarProp
             <div className="modal-actions-row">
               {isEditing ? (
                 <>
-                  <button className="flat-action-btn secondary" onClick={() => setIsEditing(false)}>
+                  <button className="flat-action-btn secondary" onClick={() => setIsEditing(false)} disabled={isSaving}>
                     Cancel
                   </button>
-                  <button className="flat-action-btn primary" onClick={handleSaveEdit}>
-                    Save
+                  <button className="flat-action-btn primary" onClick={handleSaveEdit} disabled={isSaving}>
+                    {isSaving ? "Saving..." : "Save"}
                   </button>
                 </>
               ) : (
@@ -234,6 +277,7 @@ export function RightSidebar({ isCollapsed, onToggleCollapse }: RightSidebarProp
                   value={newMemoryText}
                   onChange={(e) => setNewMemoryText(e.target.value)}
                   placeholder="Enter new research memory..."
+                  disabled={isSaving}
                   autoFocus
                 />
               </div>
@@ -241,11 +285,11 @@ export function RightSidebar({ isCollapsed, onToggleCollapse }: RightSidebarProp
 
             {/* Bottom Right Actions */}
             <div className="modal-actions-row">
-              <button className="flat-action-btn secondary" onClick={handleCloseAddModal}>
+              <button className="flat-action-btn secondary" onClick={handleCloseAddModal} disabled={isSaving}>
                 Cancel
               </button>
-              <button className="flat-action-btn primary" onClick={handleSaveNewMemory}>
-                Save
+              <button className="flat-action-btn primary" onClick={handleSaveNewMemory} disabled={isSaving}>
+                {isSaving ? "Saving..." : "Save"}
               </button>
             </div>
           </div>
@@ -256,3 +300,4 @@ export function RightSidebar({ isCollapsed, onToggleCollapse }: RightSidebarProp
   );
 }
 
+export default RightSidebar;
