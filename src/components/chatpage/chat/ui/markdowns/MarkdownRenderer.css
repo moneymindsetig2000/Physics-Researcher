@@ -2,6 +2,7 @@
   width: 100%;
 }
 
+/* ── Block Math (display mode) ──────────────────────────────────────────── */
 .block-math-wrapper {
   margin: 1.25rem 0;
   padding: 1rem 1.25rem;
@@ -13,28 +14,37 @@
   justify-content: center;
 }
 
-.block-math-wrapper math {
-  font-size: 1.36rem !important; /* Premium block equation size */
-}
-
+/* ── Inline Math ──────────────────────────────────────────────────────────  */
 .inline-math-container {
-  display: inline-block;
-  vertical-align: middle;
-  padding: 0 4px;
+  display: inline;
+  vertical-align: baseline;
 }
 
-.inline-math-container math {
-  font-size: 1.22em !important; /* Make inline equations and variables match standard font height */
-}
-
-math {
-  font-family: Cambria, "Cambria Math", "Nimbus Roman No9 L", "Times New Roman", Times, serif;
+/* ── KaTeX overrides ──────────────────────────────────────────────────── */
+.katex {
+  font-size: 1.35em !important;
   color: rgba(255, 255, 255, 0.95);
 }
 
-/* Ensure scripts and operators maintain distinct premium styles */
-msub *, msup * {
-  font-size: 0.85em !important; /* Ensure subscript/superscript tags scaling is readable */
+.block-math-wrapper .katex {
+  font-size: 1.6em !important;
+}
+
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  margin: 0 !important;
+}
+
+/* ── Code ─────────────────────────────────────────────────────────────────  */
+.inline-code {
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
+  font-size: 0.82em;
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  padding: 1px 5px;
 }
 
 .markdown-code-block {
@@ -62,12 +72,14 @@ msub *, msup * {
 }
 
 .code-block-pre code {
-  font-family: monospace;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
   font-size: 0.85rem;
   color: rgba(255, 255, 255, 0.85);
   line-height: 1.5;
+  white-space: pre;
 }
 
+/* ── Error states ─────────────────────────────────────────────────────────  */
 .math-error {
   color: #ef4444;
   font-family: monospace;
@@ -86,7 +98,115 @@ msub *, msup * {
   margin: 1rem 0;
 }
 
-/* Premium Glassmorphism Tables styling */
+/* ── Lists ────────────────────────────────────────────────────────────────  */
+.message-ul,
+.message-ol {
+  margin: 0.5rem 0 0.5rem 1.5rem;
+  padding: 0;
+  color: rgba(255, 255, 255, 0.85);
+  font-family: var(--font-sans);
+  font-size: 0.97rem;
+  line-height: 1.7;
+}
+
+.message-ul li,
+.message-ol li {
+  margin-bottom: 0.2rem;
+}
+
+/* ── Blockquote ───────────────────────────────────────────────────────────  */
+.message-blockquote {
+  margin: 0.75rem 0;
+  padding: 0.6rem 1rem;
+  border-left: 3px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 0 6px 6px 0;
+  color: rgba(255, 255, 255, 0.7);
+  font-style: italic;
+}
+
+.message-blockquote p {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+/* ── Horizontal Rule ──────────────────────────────────────────────────────  */
+.message-hr {
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  margin: 1.2rem 0;
+}
+
+/* ── Headings ─────────────────────────────────────────────────────────────  */
+.message-h1 {
+  font-size: 1.65rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 1.25rem 0 0.6rem;
+  font-family: var(--font-sans);
+  line-height: 1.2;
+}
+
+.message-h2 {
+  font-size: 1.35rem;
+  font-weight: 650;
+  color: #ffffff;
+  margin: 1.1rem 0 0.5rem;
+  font-family: var(--font-sans);
+  line-height: 1.25;
+}
+
+.message-h3 {
+  font-size: 1.15rem;
+  font-weight: 620;
+  color: rgba(255, 255, 255, 0.95);
+  margin: 1rem 0 0.4rem;
+  font-family: var(--font-sans);
+}
+
+.message-h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  margin: 0.85rem 0 0.35rem;
+  font-family: var(--font-sans);
+}
+
+.message-h5 {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.8);
+  margin: 0.75rem 0 0.3rem;
+  font-family: var(--font-sans);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.message-h6 {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.65);
+  margin: 0.65rem 0 0.25rem;
+  font-family: var(--font-sans);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ── Body text ────────────────────────────────────────────────────────────  */
+.message-text {
+  margin: 0.15rem 0;
+  color: rgba(255, 255, 255, 0.85);
+  font-family: var(--font-sans);
+  font-size: 0.97rem;
+  line-height: 1.7;
+}
+
+.message-spacing {
+  height: 0.45rem;
+}
+
+/* ── Tables ───────────────────────────────────────────────────────────────  */
 .markdown-table-wrapper {
   width: 100%;
   overflow-x: auto;
