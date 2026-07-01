@@ -1,11 +1,43 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { DEFAULT_TEMPERATURE, DEFAULT_TOP_P, DEFAULT_CUSTOM_INSTRUCTIONS } from '../../../../utils/ai/config';
 
 export function FineTuningTab() {
-  const [temperature, setTemperature] = useState<number>(0.7);
-  const [topP, setTopP] = useState<number>(0.90);
-  const [customInstructions, setCustomInstructions] = useState<string>('');
+  const [temperature, setTemperature] = useState<number>(() => {
+    const stored = localStorage.getItem('physica_ai_temperature');
+    return stored !== null ? parseFloat(stored) : DEFAULT_TEMPERATURE;
+  });
+  const [topP, setTopP] = useState<number>(() => {
+    const stored = localStorage.getItem('physica_ai_top_p');
+    return stored !== null ? parseFloat(stored) : DEFAULT_TOP_P;
+  });
+  const [customInstructions, setCustomInstructions] = useState<string>(() => {
+    const stored = localStorage.getItem('physica_ai_custom_instructions');
+    return stored !== null ? stored : DEFAULT_CUSTOM_INSTRUCTIONS;
+  });
   const [tempInstructions, setTempInstructions] = useState<string>('');
   const [isEditingInstructions, setIsEditingInstructions] = useState<boolean>(false);
+
+  // Sync state changes to localStorage dynamically
+  useEffect(() => {
+    localStorage.setItem('physica_ai_temperature', temperature.toString());
+  }, [temperature]);
+
+  useEffect(() => {
+    localStorage.setItem('physica_ai_top_p', topP.toString());
+  }, [topP]);
+
+  useEffect(() => {
+    localStorage.setItem('physica_ai_custom_instructions', customInstructions);
+  }, [customInstructions]);
+
+  // Reset parameters back to config file defaults
+  const handleResetToDefaults = () => {
+    setTemperature(DEFAULT_TEMPERATURE);
+    setTopP(DEFAULT_TOP_P);
+    setCustomInstructions(DEFAULT_CUSTOM_INSTRUCTIONS);
+    setTempInstructions('');
+    setIsEditingInstructions(false);
+  };
 
   const handleTempMinus = () => {
     setTemperature(prev => Math.max(0, Math.round((prev - 0.05) * 100) / 100));
@@ -43,9 +75,24 @@ export function FineTuningTab() {
   const topPPercent = topP * 100;
 
   return (
-    <div className="tab-pane-content fade-in">
-      <h2 className="tab-title">Fine-tuning Settings</h2>
-      <p className="tab-description">Experiment with parameters and model inference constraints in real-time.</p>
+    <div className="tab-pane-content fade-in" id="fine-tuning-tab-pane">
+      <div className="dashboard-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+        <div>
+          <h2 className="tab-title">Fine-tuning Settings</h2>
+          <p className="tab-description" style={{ margin: 0 }}>Experiment with parameters and model inference constraints in real-time.</p>
+        </div>
+        <button 
+          className="settings-action-btn secondary-action" 
+          onClick={handleResetToDefaults}
+          style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+        >
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ display: 'block' }}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
+          </svg>
+          <span>Reset to Defaults</span>
+        </button>
+      </div>
+
       <div className="lab-options">
         <div className="lab-control-group">
           <label>Inference Temperature</label>
@@ -77,6 +124,7 @@ export function FineTuningTab() {
           </div>
           <span className="control-help">Higher temperature produces more creative, less structured outputs.</span>
         </div>
+        
         <div className="lab-control-group">
           <label>Top P (Nucleus Sampling)</label>
           <div className="lab-slider-row">
@@ -106,6 +154,7 @@ export function FineTuningTab() {
             <span className="slider-val">{topP.toFixed(2)}</span>
           </div>
         </div>
+
         <div className="lab-control-group" style={{ marginTop: '1rem' }}>
           <label>Custom Instructions</label>
           <textarea

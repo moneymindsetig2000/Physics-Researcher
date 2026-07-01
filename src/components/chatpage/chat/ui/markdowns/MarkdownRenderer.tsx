@@ -341,7 +341,7 @@ function renderTableBlock(tableLines: string[], key: string): React.ReactNode {
   );
 }
 
-export function MarkdownRenderer({ content }: MarkdownRendererProps) {
+export const MarkdownRenderer = React.memo(function MarkdownRenderer({ content }: MarkdownRendererProps) {
   if (!content) return null;
 
   const tokens = content.split(/(\$\$.*?\$\$|```[\s\S]*?```)/g);
@@ -462,4 +462,6 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
       })}
     </div>
   );
-}
+}, (prevProps, nextProps) => {
+  return prevProps.content === nextProps.content;
+});

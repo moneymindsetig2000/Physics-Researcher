@@ -1,5 +1,13 @@
 import { GoogleGenAI, ThinkingLevel } from "@google/genai";
-import { GEMINI_API_KEY, CANDIDATE_POOL_SIZE, MAX_CONTEXT_MEMORIES, RELEVANCE_THRESHOLD } from "./config";
+import { 
+  GEMINI_API_KEY, 
+  CANDIDATE_POOL_SIZE, 
+  MAX_CONTEXT_MEMORIES, 
+  RELEVANCE_THRESHOLD,
+  DEFAULT_TEMPERATURE,
+  DEFAULT_TOP_P,
+  DEFAULT_CUSTOM_INSTRUCTIONS
+} from "./config";
 import type { MemoryRecord, TraceRecord } from "./types";
 import { rankMemories, formatSystemInstruction } from "../pipeline/pipeline";
 
@@ -417,6 +425,21 @@ Return ONLY the JSON object. Do not include markdown, explanations, or additiona
     builtSystemInstruction = "";
   }
 
+  // Load dynamic model parameters from localStorage with fallback to file configs
+  const storedTemp = typeof window !== 'undefined' ? localStorage.getItem('physica_ai_temperature') : null;
+  const storedTopP = typeof window !== 'undefined' ? localStorage.getItem('physica_ai_top_p') : null;
+  const storedInstructions = typeof window !== 'undefined' ? localStorage.getItem('physica_ai_custom_instructions') : null;
+
+  const temperature = storedTemp !== null ? parseFloat(storedTemp) : DEFAULT_TEMPERATURE;
+  const topP = storedTopP !== null ? parseFloat(storedTopP) : DEFAULT_TOP_P;
+  const customInstructions = storedInstructions !== null ? storedInstructions : DEFAULT_CUSTOM_INSTRUCTIONS;
+
+  if (customInstructions && customInstructions.trim()) {
+    builtSystemInstruction = builtSystemInstruction 
+      ? `${builtSystemInstruction}\n\nAdditional User Instructions:\n${customInstructions}` 
+      : customInstructions;
+  }
+
   // Step 8: Call the main reasoning model with web search grounding
   const mainModel = "gemma-4-31b-it";
 
@@ -446,7 +469,9 @@ Return ONLY the JSON object. Do not include markdown, explanations, or additiona
       tools: [{ googleSearch: {} }],
       thinkingConfig: {
         thinkingLevel: mode === 'fast' ? ThinkingLevel.MINIMAL : ThinkingLevel.HIGH
-      }
+      },
+      temperature,
+      topP
     }
   }));
 
@@ -1098,6 +1123,21 @@ Return ONLY the JSON object. Do not include markdown, explanations, or additiona
     builtSystemInstruction = formatSystemInstruction(finalSurvivingMemories);
   }
 
+  // Load dynamic model parameters from localStorage with fallback to file configs
+  const storedTemp = typeof window !== 'undefined' ? localStorage.getItem('physica_ai_temperature') : null;
+  const storedTopP = typeof window !== 'undefined' ? localStorage.getItem('physica_ai_top_p') : null;
+  const storedInstructions = typeof window !== 'undefined' ? localStorage.getItem('physica_ai_custom_instructions') : null;
+
+  const temperature = storedTemp !== null ? parseFloat(storedTemp) : DEFAULT_TEMPERATURE;
+  const topP = storedTopP !== null ? parseFloat(storedTopP) : DEFAULT_TOP_P;
+  const customInstructions = storedInstructions !== null ? storedInstructions : DEFAULT_CUSTOM_INSTRUCTIONS;
+
+  if (customInstructions && customInstructions.trim()) {
+    builtSystemInstruction = builtSystemInstruction 
+      ? `${builtSystemInstruction}\n\nAdditional User Instructions:\n${customInstructions}` 
+      : customInstructions;
+  }
+
   // Step 8: Call the main reasoning model with web search grounding (STREAMING)
   const mainModel = "gemma-4-31b-it";
   let replyText = "";
@@ -1106,7 +1146,7 @@ Return ONLY the JSON object. Do not include markdown, explanations, or additiona
   let searchQueries: string[] = [];
   let searchSources: any[] = [];
 
-  // Throttle callback to at most once per 100ms to eliminate UI scroll lag during streaming
+  // Throttle callback to at most once per 200ms to eliminate UI scroll lag during streaming
   let lastCallbackTime = 0;
   let pendingChunk: { text: string; thought: string } | null = null;
   let throttleTimeout: any = null;
@@ -1115,7 +1155,7 @@ Return ONLY the JSON object. Do not include markdown, explanations, or additiona
     pendingChunk = { text, thought };
     const now = Date.now();
 
-    if (force || now - lastCallbackTime >= 100) {
+    if (force || now - lastCallbackTime >= 200) {
       if (throttleTimeout) {
         clearTimeout(throttleTimeout);
         throttleTimeout = null;
@@ -1131,7 +1171,7 @@ Return ONLY the JSON object. Do not include markdown, explanations, or additiona
           pendingChunk = null;
         }
         throttleTimeout = null;
-      }, 100 - (now - lastCallbackTime));
+      }, 200 - (now - lastCallbackTime));
     }
   };
 
@@ -1162,7 +1202,9 @@ Return ONLY the JSON object. Do not include markdown, explanations, or additiona
         tools: [{ googleSearch: {} }],
         thinkingConfig: {
           thinkingLevel: mode === 'fast' ? ThinkingLevel.MINIMAL : ThinkingLevel.HIGH
-        }
+        },
+        temperature,
+        topP
       }
     }));
 

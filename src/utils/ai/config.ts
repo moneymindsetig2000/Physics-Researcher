@@ -1,6 +1,12 @@
 // Config file for Gemini API integration
 export const GEMINI_API_KEY: string = "AIzaSyB7cxaeZhWMy61WGxWQkj3FoKFD0WJeiRs";
 
+// Model inference default settings (Gemma 4 configuration)
+export const DEFAULT_TEMPERATURE = 0.7;
+export const DEFAULT_TOP_P = 0.90;
+export const DEFAULT_CUSTOM_INSTRUCTIONS = "";
+
+
 // Configurable Ranking Constants
 export const TOP_K = 5;
 export const RELEVANCE_THRESHOLD = 0.55;   // anything scoring below this is dropped entirely

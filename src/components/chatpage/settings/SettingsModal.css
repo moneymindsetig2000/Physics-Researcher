@@ -382,6 +382,125 @@
   margin: auto 0 0 0;
 }
 
+/* Details list within cards */
+.card-details-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.card-detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.detail-label {
+  color: rgba(255, 255, 255, 0.45);
+  white-space: nowrap;
+}
+
+.detail-value {
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.detail-value.connected,
+.detail-value.active,
+.detail-value.ready,
+.detail-value.available {
+  color: #10b981; /* Premium green */
+}
+
+.detail-value.checking {
+  color: #f59e0b; /* Premium orange */
+}
+
+.detail-value.disconnected,
+.detail-value.offline,
+.detail-value.error {
+  color: #ef4444; /* Premium red */
+}
+
+.status-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+}
+
+.status-header.online {
+  color: #10b981;
+}
+
+.status-header.checking {
+  color: #f59e0b;
+}
+
+.status-header.offline {
+  color: #ef4444;
+}
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  transition: background-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.status-dot.online {
+  background-color: #10b981;
+  box-shadow: 0 0 8px #10b981;
+}
+
+.status-dot.checking {
+  background-color: #f59e0b;
+  box-shadow: 0 0 8px #f59e0b;
+}
+
+.status-dot.offline {
+  background-color: #ef4444;
+  box-shadow: 0 0 8px #ef4444;
+}
+
+/* Recent activities bullet list */
+.recent-activity-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.recent-activity-item {
+  position: relative;
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.7);
+  padding-left: 12px;
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recent-activity-item::before {
+  content: '•';
+  position: absolute;
+  left: 0;
+  color: #10b981;
+  font-weight: bold;
+}
+
 /* Quota Bar */
 .quota-bar {
   width: 100%;

@@ -15,7 +15,7 @@ interface ArchitectureTraceBlockProps {
   trace: TraceRecord;
 }
 
-export const ArchitectureTraceBlock: React.FC<ArchitectureTraceBlockProps> = ({ trace }) => {
+const ArchitectureTraceBlockInner: React.FC<ArchitectureTraceBlockProps> = ({ trace }) => {
   const [isOpen, setIsOpen] = useState(false);
 
   // Summarize trace state for quick overview
@@ -452,3 +452,7 @@ export const ArchitectureTraceBlock: React.FC<ArchitectureTraceBlockProps> = ({ 
     </div>
   );
 };
+
+export const ArchitectureTraceBlock = React.memo(ArchitectureTraceBlockInner, (prev, next) => {
+  return prev.trace === next.trace;
+});

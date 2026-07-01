@@ -92,6 +92,9 @@ export function ChatWorkspace({
 
       {/* Main Chat Flow Area (centered welcome state or message thread) */}
       <main className="chat-flow-container" id="chat-flow">
+        {/* Top Blur Overlay */}
+        <div className="workspace-blur-overlay-top" />
+
         {activeChat && activeChat.messages.length > 0 ? (
           <div className="conversation-flow" id="conversation-flow-list">
             {activeChat.messages.map((msg) => (
@@ -101,6 +104,9 @@ export function ChatWorkspace({
         ) : (
           <WelcomeState onSelectPrompt={(promptText) => onSendPrompt(promptText, 'thinking')} />
         )}
+
+        {/* Bottom Blur Overlay */}
+        <div className="workspace-blur-overlay-bottom" />
 
         {/* Bottom Composer and Tools Container */}
         <div className="composer-container">

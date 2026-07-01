@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Sidebar } from './sidebar/Sidebar';
 import { ChatWorkspace } from './chat/ChatWorkspace';
 import { RightSidebar } from './rightsidebar/RightSidebar';
@@ -27,6 +27,9 @@ export function ChatPage() {
   const [chats, setChats] = useState<Chat[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [memories, setMemories] = useState<MemoryRecord[]>([]);
+  // Ref to track whether seed embeddings have been processed — prevents the
+  // embedding useEffect from re-firing when setMemories() updates the array.
+  const embeddingProcessedRef = useRef(false);
 
   // 1. Initial hydration on mount
   useEffect(() => {
@@ -68,44 +71,49 @@ export function ChatPage() {
     }
   }, [chats]);
 
-  // 2. Auto-Embedding Effect for Seed Memories
+  // 2. Auto-Embedding Effect for Seed Memories — runs ONCE after initial load.
+  // Uses a ref gate so that when setMemories() is called inside processSeedEmbeddings,
+  // it does NOT re-trigger this effect (which was the infinite loop cause).
   useEffect(() => {
     if (memories.length === 0) return;
+    if (embeddingProcessedRef.current) return; // gate: only run once
+
     const needsEmbedding = memories.some(m => !m.embedding || m.embedding.length === 0);
-
-    if (needsEmbedding) {
-      const processSeedEmbeddings = async () => {
-        try {
-          const updated = [...memories];
-          let changed = false;
-          for (let i = 0; i < updated.length; i++) {
-            const mem = updated[i];
-            if (!mem.embedding || mem.embedding.length === 0) {
-              const vector = await embedText(mem.memory, "RETRIEVAL_DOCUMENT");
-              updated[i] = {
-                ...mem,
-                embedding: vector
-              };
-              changed = true;
-            }
-          }
-          if (changed) {
-            setMemories(updated);
-            localStorage.setItem('physica_ai_memories', JSON.stringify(updated));
-          }
-        } catch (err) {
-          console.error("Failed to generate seed embeddings:", err);
-        }
-      };
-      processSeedEmbeddings();
+    if (!needsEmbedding) {
+      embeddingProcessedRef.current = true;
+      return;
     }
-  }, [memories]);
 
-  const handleNewChat = () => {
+    embeddingProcessedRef.current = true; // mark before async to prevent duplicate runs
+
+    const processSeedEmbeddings = async () => {
+      try {
+        const snapshot = [...memories]; // capture a snapshot, don't close over live state
+        let changed = false;
+        for (let i = 0; i < snapshot.length; i++) {
+          const mem = snapshot[i];
+          if (!mem.embedding || mem.embedding.length === 0) {
+            const vector = await embedText(mem.memory, "RETRIEVAL_DOCUMENT");
+            snapshot[i] = { ...mem, embedding: vector };
+            changed = true;
+          }
+        }
+        if (changed) {
+          setMemories(snapshot);
+          localStorage.setItem('physica_ai_memories', JSON.stringify(snapshot));
+        }
+      } catch (err) {
+        console.error("Failed to generate seed embeddings:", err);
+      }
+    };
+    processSeedEmbeddings();
+  }, [memories.length]); // depend only on COUNT — fires on initial load only, not on content update
+
+  const handleNewChat = useCallback(() => {
     setActiveChatId(null);
-  };
+  }, []);
 
-  const handleSendPrompt = async (promptText: string, mode: 'fast' | 'thinking' | 'deep') => {
+  const handleSendPrompt = useCallback(async (promptText: string, mode: 'fast' | 'thinking' | 'deep') => {
     if (!promptText.trim()) return;
 
     // Extract past conversation history before state update
@@ -237,20 +245,36 @@ export function ChatPage() {
         return chat;
       }));
     }
-  };
+  }, [activeChatId, chats, memories]);
 
-  const activeChat = chats.find(c => c.id === activeChatId) || null;
+  const activeChat = useMemo(
+    () => chats.find(c => c.id === activeChatId) || null,
+    [chats, activeChatId]
+  );
 
   const sidebarChats = useMemo(() => {
     return chats.map(c => ({ id: c.id, name: c.name }));
-  }, [chats.map(c => `${c.id}:${c.name}`).join(',')]);
+  }, [chats.length, chats[0]?.name]);
+
+  const handleUpdateMemories = useCallback((updated: MemoryRecord[]) => {
+    setMemories(updated);
+    localStorage.setItem('physica_ai_memories', JSON.stringify(updated));
+  }, []);
+
+  const handleToggleRightSidebar = useCallback(() => {
+    setIsRightSidebarCollapsed(prev => !prev);
+  }, []);
+
+  const handleToggleLeftSidebar = useCallback(() => {
+    setIsLeftSidebarCollapsed(prev => !prev);
+  }, []);
 
   return (
     <div className="supernova-chat-page" id="supernova-chat-page-root">
       {/* 3-Pane Layout */}
       <Sidebar 
         isCollapsed={isLeftSidebarCollapsed} 
-        onToggleCollapse={() => setIsLeftSidebarCollapsed(!isLeftSidebarCollapsed)}
+        onToggleCollapse={handleToggleLeftSidebar}
         chats={sidebarChats}
         activeChatId={activeChatId}
         onSelectChat={setActiveChatId}
@@ -258,20 +282,17 @@ export function ChatPage() {
       />
       <ChatWorkspace 
         isRightSidebarCollapsed={isRightSidebarCollapsed}
-        onToggleRightSidebar={() => setIsRightSidebarCollapsed(!isRightSidebarCollapsed)}
+        onToggleRightSidebar={handleToggleRightSidebar}
         isLeftSidebarCollapsed={isLeftSidebarCollapsed}
-        onToggleLeftSidebar={() => setIsLeftSidebarCollapsed(!isLeftSidebarCollapsed)}
+        onToggleLeftSidebar={handleToggleLeftSidebar}
         activeChat={activeChat}
         onSendPrompt={handleSendPrompt}
       />
       <RightSidebar 
         isCollapsed={isRightSidebarCollapsed} 
-        onToggleCollapse={() => setIsRightSidebarCollapsed(!isRightSidebarCollapsed)} 
+        onToggleCollapse={handleToggleRightSidebar} 
         memories={memories}
-        onUpdateMemories={(updated) => {
-          setMemories(updated);
-          localStorage.setItem('physica_ai_memories', JSON.stringify(updated));
-        }}
+        onUpdateMemories={handleUpdateMemories}
       />
     </div>
   );
