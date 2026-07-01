@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Sidebar } from './sidebar/Sidebar';
 import { ChatWorkspace } from './chat/ChatWorkspace';
 import { RightSidebar } from './rightsidebar/RightSidebar';
@@ -108,6 +108,14 @@ export function ChatPage() {
   const handleSendPrompt = async (promptText: string, mode: 'fast' | 'thinking' | 'deep') => {
     if (!promptText.trim()) return;
 
+    // Extract past conversation history before state update
+    const activeChat = chats.find(c => c.id === activeChatId);
+    const historyMessages = activeChat ? activeChat.messages : [];
+    const chatHistory = historyMessages.map(msg => ({
+      sender: msg.sender,
+      text: msg.text
+    }));
+
     const userMessage: Message = {
       id: 'msg_user_' + Date.now(),
       sender: 'user',
@@ -146,7 +154,7 @@ export function ChatPage() {
     }
 
     try {
-      // Execute the end-to-end reasoning pipeline with streaming
+      // Execute the end-to-end reasoning pipeline with streaming, passing conversation history context
       const result = await runQueryPipelineStream(
         promptText,
         memories,
@@ -170,7 +178,8 @@ export function ChatPage() {
             }
             return chat;
           }));
-        }
+        },
+        chatHistory
       );
 
       // Once streaming fully completes, attach final trace data and sync states
@@ -232,13 +241,17 @@ export function ChatPage() {
 
   const activeChat = chats.find(c => c.id === activeChatId) || null;
 
+  const sidebarChats = useMemo(() => {
+    return chats.map(c => ({ id: c.id, name: c.name }));
+  }, [chats.map(c => `${c.id}:${c.name}`).join(',')]);
+
   return (
     <div className="supernova-chat-page" id="supernova-chat-page-root">
       {/* 3-Pane Layout */}
       <Sidebar 
         isCollapsed={isLeftSidebarCollapsed} 
         onToggleCollapse={() => setIsLeftSidebarCollapsed(!isLeftSidebarCollapsed)}
-        chats={chats.map(c => ({ id: c.id, name: c.name }))}
+        chats={sidebarChats}
         activeChatId={activeChatId}
         onSelectChat={setActiveChatId}
         onNewChat={handleNewChat}

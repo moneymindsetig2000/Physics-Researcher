@@ -4,6 +4,7 @@ import { WelcomeState } from './ui/WelcomeState';
 import { ComposerInput } from './ui/ComposerInput';
 import { WorkspaceFooter } from './ui/WorkspaceFooter';
 import { ArchitectureTraceBlock } from './ui/ArchitectureTraceBlock';
+import { MarkdownRenderer } from './ui/markdowns/MarkdownRenderer';
 import type { TraceRecord } from '../../../utils/ai/types';
 import './ChatWorkspace.css';
 
@@ -35,7 +36,7 @@ const MessageItem = React.memo(({ msg }: { msg: Message }) => {
     <div className={`message-row ${msg.sender === 'user' ? 'user-row' : 'ai-row'}`}>
       {msg.sender === 'user' ? (
         <div className="user-message-box">
-          <p className="message-text">{msg.text}</p>
+          <MarkdownRenderer content={msg.text} />
         </div>
       ) : (
         <div className="ai-message-ground">
@@ -48,7 +49,7 @@ const MessageItem = React.memo(({ msg }: { msg: Message }) => {
               <div className="thinking-content">{msg.thought}</div>
             </div>
           )}
-          {msg.text && <p className="message-text">{msg.text}</p>}
+          {msg.text && <MarkdownRenderer content={msg.text} />}
           {msg.trace && <ArchitectureTraceBlock trace={msg.trace} />}
         </div>
       )}

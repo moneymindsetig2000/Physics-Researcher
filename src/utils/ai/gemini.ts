@@ -32,7 +32,7 @@ async function callWithRetry<T>(fn: () => Promise<T>, retries = 4, delay = 1500)
     return await fn();
   } catch (error: any) {
     const errorStr = String(error);
-    const isRetryable = errorStr.includes("500") || errorStr.includes("503") || errorStr.includes("demand") || errorStr.includes("INTERNAL") || errorStr.includes("UNAVAILABLE");
+    const isRetryable = errorStr.includes("500") || errorStr.includes("503") || errorStr.includes("demand") || errorStr.includes("INTERNAL") || errorStr.includes("UNAVAILABLE") || errorStr.includes("RESOURCE_EXHAUSTED") || errorStr.includes("429");
     if (retries > 0 && isRetryable) {
       console.warn(`Temporary API error encountered. Retrying in ${delay}ms... (${retries} retries left). Error:`, error);
       await new Promise(resolve => setTimeout(resolve, delay));
@@ -75,7 +75,8 @@ export interface PipelineResult {
 export async function runQueryPipeline(
   userQuery: string,
   memories: MemoryRecord[],
-  mode: 'fast' | 'thinking' | 'deep' = 'thinking'
+  mode: 'fast' | 'thinking' | 'deep' = 'thinking',
+  chatHistory: { sender: 'user' | 'ai'; text: string }[] = []
 ): Promise<PipelineResult> {
   const ai = getAIClient();
 
@@ -85,7 +86,7 @@ export async function runQueryPipeline(
 
   try {
     const decisionResponse = await callWithRetry(() => ai.models.generateContent({
-      model: "gemma-4-26b-a4b-it",
+      model: "gemma-4-31b-it",
       contents: `User Message:
 "${userQuery}"
 
@@ -333,7 +334,7 @@ then related memories are relevant.
 Return ONLY the JSON object. Do not include markdown, explanations, or additional text.`;
 
         const res = await callWithRetry(() => ai.models.generateContent({
-          model: "gemma-4-26b-a4b-it",
+          model: "gemma-4-31b-it",
           contents: prompt,
           config: {
             thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
@@ -417,13 +418,31 @@ Return ONLY the JSON object. Do not include markdown, explanations, or additiona
   }
 
   // Step 8: Call the main reasoning model with web search grounding
-  const mainModel = "gemma-4-26b-a4b-it";
+  const mainModel = "gemma-4-31b-it";
+
+  // Build full content array including history for conversational context
+  const apiContents: any[] = [];
+  for (const turn of chatHistory) {
+    if (turn.text && turn.text.trim()) {
+      apiContents.push({
+        role: turn.sender === 'user' ? 'user' : 'model',
+        parts: [{ text: turn.text }]
+      });
+    }
+  }
+  apiContents.push({
+    role: 'user',
+    parts: [{ text: userQuery }]
+  });
 
   const mainResponse = await callWithRetry(() => ai.models.generateContent({
     model: mainModel,
-    contents: userQuery,
+    contents: apiContents,
     config: {
-      systemInstruction: builtSystemInstruction || undefined,
+      // Structured Content object with explicit role:'system' — required by Gemma API to prevent 500 errors
+      systemInstruction: builtSystemInstruction
+        ? { role: 'system', parts: [{ text: builtSystemInstruction }] }
+        : undefined,
       tools: [{ googleSearch: {} }],
       thinkingConfig: {
         thinkingLevel: mode === 'fast' ? ThinkingLevel.MINIMAL : ThinkingLevel.HIGH
@@ -753,7 +772,8 @@ export async function runQueryPipelineStream(
   userQuery: string,
   memories: MemoryRecord[],
   mode: 'fast' | 'thinking' | 'deep' = 'thinking',
-  onChunk: (data: { text: string; thought: string }) => void
+  onChunk: (data: { text: string; thought: string }) => void,
+  chatHistory: { sender: 'user' | 'ai'; text: string }[] = []
 ): Promise<PipelineResult> {
   const ai = getAIClient();
 
@@ -763,7 +783,7 @@ export async function runQueryPipelineStream(
 
   try {
     const decisionResponse = await callWithRetry(() => ai.models.generateContent({
-      model: "gemma-4-26b-a4b-it",
+      model: "gemma-4-31b-it",
       contents: `User Message:
 "${userQuery}"
 
@@ -1006,7 +1026,7 @@ then related memories are relevant.
 Return ONLY the JSON object. Do not include markdown, explanations, or additional text.`;
 
         const res = await callWithRetry(() => ai.models.generateContent({
-          model: "gemma-4-26b-a4b-it",
+          model: "gemma-4-31b-it",
           contents: prompt,
           config: {
             thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
@@ -1079,7 +1099,7 @@ Return ONLY the JSON object. Do not include markdown, explanations, or additiona
   }
 
   // Step 8: Call the main reasoning model with web search grounding (STREAMING)
-  const mainModel = "gemma-4-26b-a4b-it";
+  const mainModel = "gemma-4-31b-it";
   let replyText = "";
   let accumulatedThought = "";
   let searchUsed = false;
@@ -1115,12 +1135,30 @@ Return ONLY the JSON object. Do not include markdown, explanations, or additiona
     }
   };
 
+  // Build full content array including history for conversational context
+  const apiContents: any[] = [];
+  for (const turn of chatHistory) {
+    if (turn.text && turn.text.trim()) {
+      apiContents.push({
+        role: turn.sender === 'user' ? 'user' : 'model',
+        parts: [{ text: turn.text }]
+      });
+    }
+  }
+  apiContents.push({
+    role: 'user',
+    parts: [{ text: userQuery }]
+  });
+
   try {
     const responseStream = await callWithRetry(() => ai.models.generateContentStream({
       model: mainModel,
-      contents: userQuery,
+      contents: apiContents,
       config: {
-        systemInstruction: builtSystemInstruction || undefined,
+        // Structured Content object with explicit role:'system' — required by Gemma API to prevent 500 errors
+        systemInstruction: builtSystemInstruction
+          ? { role: 'system', parts: [{ text: builtSystemInstruction }] }
+          : undefined,
         tools: [{ googleSearch: {} }],
         thinkingConfig: {
           thinkingLevel: mode === 'fast' ? ThinkingLevel.MINIMAL : ThinkingLevel.HIGH

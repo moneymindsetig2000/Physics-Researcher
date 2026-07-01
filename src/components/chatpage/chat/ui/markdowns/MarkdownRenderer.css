@@ -1,0 +1,130 @@
+.markdown-render-body {
+  width: 100%;
+}
+
+.block-math-wrapper {
+  margin: 1.25rem 0;
+  padding: 1rem 1.25rem;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 8px;
+  border-left: 3.5px solid rgba(255, 255, 255, 0.18);
+  overflow-x: auto;
+  display: flex;
+  justify-content: center;
+}
+
+.block-math-wrapper math {
+  font-size: 1.36rem !important; /* Premium block equation size */
+}
+
+.inline-math-container {
+  display: inline-block;
+  vertical-align: middle;
+  padding: 0 4px;
+}
+
+.inline-math-container math {
+  font-size: 1.22em !important; /* Make inline equations and variables match standard font height */
+}
+
+math {
+  font-family: Cambria, "Cambria Math", "Nimbus Roman No9 L", "Times New Roman", Times, serif;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+/* Ensure scripts and operators maintain distinct premium styles */
+msub *, msup * {
+  font-size: 0.85em !important; /* Ensure subscript/superscript tags scaling is readable */
+}
+
+.markdown-code-block {
+  margin: 1rem 0;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.code-block-lang {
+  background: rgba(255, 255, 255, 0.04);
+  padding: 4px 12px;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+  font-family: monospace;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.code-block-pre {
+  margin: 0;
+  padding: 12px;
+  overflow-x: auto;
+}
+
+.code-block-pre code {
+  font-family: monospace;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.85);
+  line-height: 1.5;
+}
+
+.math-error {
+  color: #ef4444;
+  font-family: monospace;
+  font-size: 0.85em;
+  background: rgba(239, 68, 68, 0.1);
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+.math-error-block {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+  padding: 1rem;
+  border-radius: 6px;
+  font-family: monospace;
+  margin: 1rem 0;
+}
+
+/* Premium Glassmorphism Tables styling */
+.markdown-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  margin: 1.2rem 0;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.25);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+}
+
+.markdown-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+  text-align: left;
+}
+
+.markdown-table th {
+  background: rgba(255, 255, 255, 0.04);
+  padding: 10px 14px;
+  font-weight: 600;
+  color: #ffffff;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  font-family: var(--font-sans);
+}
+
+.markdown-table td {
+  padding: 10px 14px;
+  color: rgba(255, 255, 255, 0.85);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  font-family: var(--font-sans);
+  line-height: 1.45;
+}
+
+.markdown-table tr:last-child td {
+  border-bottom: none;
+}
+
+.markdown-table tr:hover td {
+  background: rgba(255, 255, 255, 0.02);
+}
