@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { BrandHeader } from './ui/BrandHeader';
 import { SidebarNavItem } from './ui/SidebarNavItem';
 import { UserProfileBar } from './ui/UserProfileBar';
 import { SettingsModal } from '../settings/SettingsModal';
+import { DeleteConfirmationModal } from './options/DeleteConfirmationModal';
 import './Sidebar.css';
 
 interface Chat {
   id: string;
   name: string;
+  isPinned?: boolean;
 }
 
 interface SidebarProps {
@@ -17,6 +20,8 @@ interface SidebarProps {
   activeChatId: string | null;
   onSelectChat: (id: string) => void;
   onNewChat: () => void;
+  onDeleteChat: (id: string) => void;
+  onTogglePinChat: (id: string) => void;
 }
 
 export const Sidebar = React.memo(function Sidebar({ 
@@ -25,10 +30,13 @@ export const Sidebar = React.memo(function Sidebar({
   chats,
   activeChatId,
   onSelectChat,
-  onNewChat
+  onNewChat,
+  onDeleteChat,
+  onTogglePinChat
 }: SidebarProps) {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSettingsClosing, setIsSettingsClosing] = useState(false);
+  const [chatToDelete, setChatToDelete] = useState<Chat | null>(null);
 
   const handleCloseSettings = () => {
     setIsSettingsClosing(true);
@@ -37,6 +45,15 @@ export const Sidebar = React.memo(function Sidebar({
       setIsSettingsClosing(false);
     }, 280); // matches CSS animation duration (280ms)
   };
+
+  const pinnedChats = chats.filter(c => c.isPinned);
+  const unpinnedChats = chats.filter(c => !c.isPinned);
+
+  const layoutTransition = {
+    type: 'tween',
+    ease: [0.65, 0, 0.35, 1], // Slow start, accelerate, slow settle (Apple ease-in-out)
+    duration: 0.5
+  } as const;
 
   return (
     <aside className={`supernova-sidebar ${isCollapsed ? 'collapsed' : ''}`} id="sidebar-container">
@@ -51,41 +68,105 @@ export const Sidebar = React.memo(function Sidebar({
         <span>New Chat</span>
       </button>
 
-      {/* Navigation Group: Chats */}
-      <div className="nav-group" id="group-features">
-        <span className="group-label">Chats</span>
-        {chats.length > 0 ? (
-          <ul className="nav-list">
-            {chats.map((chat) => (
-              <SidebarNavItem
-                key={chat.id}
-                id={chat.id}
-                href={`#${chat.id}`}
-                label={chat.name}
-                isActive={chat.id === activeChatId}
-                onClick={(e) => {
-                  e.preventDefault();
-                  onSelectChat(chat.id);
-                }}
-                icon={
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="nav-icon">
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                  </svg>
-                }
-              />
-            ))}
-          </ul>
-        ) : (
-          <div className="sidebar-empty-state" id="sidebar-chats-empty">
-            <div className="empty-state-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="nav-icon">
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-              </svg>
-            </div>
-            <p className="empty-state-text">No active conversations</p>
-          </div>
-        )}
-      </div>
+      {/* Scrollable Navigation Groups Container with Layout orchestration */}
+      <motion.div 
+        layout 
+        transition={layoutTransition}
+        className="nav-group-container" 
+        style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto', gap: '1rem' }}
+      >
+        <AnimatePresence initial={false}>
+          {/* Pinned Chats Section */}
+          {pinnedChats.length > 0 && (
+            <motion.div 
+              key="pinned-section"
+              layout
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={layoutTransition}
+              className="nav-group pinned-chats-group" 
+              id="group-pinned"
+            >
+              <motion.span layout transition={layoutTransition} className="group-label">
+                Pinned Chats
+              </motion.span>
+              <motion.ul layout transition={layoutTransition} className="nav-list">
+                {pinnedChats.map((chat) => (
+                  <SidebarNavItem
+                    key={chat.id}
+                    id={chat.id}
+                    href={`#${chat.id}`}
+                    label={chat.name}
+                    isActive={chat.id === activeChatId}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      onSelectChat(chat.id);
+                    }}
+                    onDeleteClick={() => setChatToDelete(chat)}
+                    onPinClick={() => onTogglePinChat(chat.id)}
+                    isPinned={true}
+                    icon={
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="nav-icon">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                      </svg>
+                    }
+                  />
+                ))}
+              </motion.ul>
+            </motion.div>
+          )}
+
+          {/* Regular Chats Section */}
+          {(unpinnedChats.length > 0 || chats.length === 0) && (
+            <motion.div 
+              key="chats-section"
+              layout
+              transition={layoutTransition}
+              className="nav-group" 
+              id="group-features"
+            >
+              <motion.span layout transition={layoutTransition} className="group-label">
+                Chats
+              </motion.span>
+              {unpinnedChats.length > 0 ? (
+                <motion.ul layout transition={layoutTransition} className="nav-list">
+                  {unpinnedChats.map((chat) => (
+                    <SidebarNavItem
+                      key={chat.id}
+                      id={chat.id}
+                      href={`#${chat.id}`}
+                      label={chat.name}
+                      isActive={chat.id === activeChatId}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        onSelectChat(chat.id);
+                      }}
+                      onDeleteClick={() => setChatToDelete(chat)}
+                      onPinClick={() => onTogglePinChat(chat.id)}
+                      isPinned={false}
+                      icon={
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="nav-icon">
+                          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                        </svg>
+                      }
+                    />
+                  ))}
+                </motion.ul>
+              ) : (
+                <div className="sidebar-empty-state" id="sidebar-chats-empty">
+                  <div className="empty-state-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="nav-icon">
+                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                    </svg>
+                  </div>
+                  <p className="empty-state-text">No active conversations</p>
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
 
       {/* User Section */}
       <UserProfileBar onOpenSettings={() => setIsSettingsOpen(true)} />
@@ -96,14 +177,30 @@ export const Sidebar = React.memo(function Sidebar({
         isClosing={isSettingsClosing} 
         onClose={handleCloseSettings} 
       />
+
+      {/* Delete Confirmation Modal Portal Overlay */}
+      <DeleteConfirmationModal
+        isOpen={chatToDelete !== null}
+        chatName={chatToDelete?.name || ''}
+        onConfirm={() => {
+          if (chatToDelete) {
+            onDeleteChat(chatToDelete.id);
+            setChatToDelete(null);
+          }
+        }}
+        onCancel={() => setChatToDelete(null)}
+      />
     </aside>
   );
 }, (prevProps, nextProps) => {
   return (
     prevProps.isCollapsed === nextProps.isCollapsed &&
     prevProps.activeChatId === nextProps.activeChatId &&
+    prevProps.onDeleteChat === nextProps.onDeleteChat &&
+    prevProps.onTogglePinChat === nextProps.onTogglePinChat &&
     // Shallow compare array elements
     prevProps.chats.length === nextProps.chats.length &&
-    prevProps.chats.every((c, i) => c.id === nextProps.chats[i].id && c.name === nextProps.chats[i].name)
+    prevProps.chats.every((c, i) => c.id === nextProps.chats[i].id && c.name === nextProps.chats[i].name && c.isPinned === nextProps.chats[i].isPinned)
   );
 });
+export default Sidebar;

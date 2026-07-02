@@ -28,7 +28,7 @@ interface ChatWorkspaceProps {
   isLeftSidebarCollapsed: boolean;
   onToggleLeftSidebar: () => void;
   activeChat: Chat | null;
-  onSendPrompt: (promptText: string, mode: 'fast' | 'thinking' | 'deep') => void;
+  onSendPrompt: (promptText: string) => void;
 }
 
 const MessageItem = React.memo(({ msg }: { msg: Message }) => {
@@ -74,9 +74,9 @@ export function ChatWorkspace({
 }: ChatWorkspaceProps) {
   const [message, setMessage] = useState('');
 
-  const handleSend = (mode: 'fast' | 'thinking' | 'deep') => {
+  const handleSend = () => {
     if (!message.trim()) return;
-    onSendPrompt(message, mode);
+    onSendPrompt(message);
     setMessage('');
   };
 
@@ -102,7 +102,7 @@ export function ChatWorkspace({
             ))}
           </div>
         ) : (
-          <WelcomeState onSelectPrompt={(promptText) => onSendPrompt(promptText, 'thinking')} />
+          <WelcomeState onSelectPrompt={onSendPrompt} />
         )}
 
         {/* Bottom Blur Overlay */}
@@ -124,4 +124,3 @@ export function ChatWorkspace({
     </div>
   );
 }
-

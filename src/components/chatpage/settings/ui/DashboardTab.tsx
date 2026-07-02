@@ -7,30 +7,63 @@ interface DashboardTabProps {
 
 type ConnectionStateType = 'Checking...' | '200 OK' | 'Offline' | 'Key Missing';
 
+// Module-level caches to avoid main-thread lag and API thrashing on every mount/tab switch
+let cachedJessieStatus: ConnectionStateType | null = null;
+let lastCheckedTime = 0;
+
+interface StatsType {
+  memoriesCount: number;
+  chatsCount: number;
+  allTimeMessages: number;
+  allTimeWebSearches: number;
+  messagesToday: number;
+  tokensUsed: number;
+  filesAnalyzed: number;
+  webSearches: number;
+  lastMemoryUpdateStr: string;
+}
+
+let cachedMemoriesStr: string | null = null;
+let cachedChatsStr: string | null = null;
+let cachedStats: StatsType | null = null;
+
 export function DashboardTab({ isOpen }: DashboardTabProps) {
   const [refreshKey, setRefreshKey] = useState<number>(0);
-  const [jessieStatus, setJessieStatus] = useState<ConnectionStateType>('Checking...');
-  const [stats, setStats] = useState({
-    memoriesCount: 0,
-    chatsCount: 0,
-    allTimeMessages: 0,
-    allTimeWebSearches: 0,
-    messagesToday: 0,
-    tokensUsed: 0,
-    filesAnalyzed: 0,
-    webSearches: 0,
-    lastMemoryUpdateStr: 'Never'
+  const [jessieStatus, setJessieStatus] = useState<ConnectionStateType>(() => {
+    if (cachedJessieStatus && Date.now() - lastCheckedTime < 30000) {
+      return cachedJessieStatus;
+    }
+    return 'Checking...';
+  });
+  const [stats, setStats] = useState<StatsType>(() => {
+    if (cachedStats) {
+      return cachedStats;
+    }
+    return {
+      memoriesCount: 0,
+      chatsCount: 0,
+      allTimeMessages: 0,
+      allTimeWebSearches: 0,
+      messagesToday: 0,
+      tokensUsed: 0,
+      filesAnalyzed: 0,
+      webSearches: 0,
+      lastMemoryUpdateStr: 'Never'
+    };
   });
 
   const handleRefresh = () => {
+    // Clear caches to force a fresh connection check and stats recalculation on refresh request
+    cachedJessieStatus = null;
+    lastCheckedTime = 0;
+    cachedMemoriesStr = null;
+    cachedChatsStr = null;
+    cachedStats = null;
     setRefreshKey(prev => prev + 1);
   };
 
   useEffect(() => {
     if (!isOpen) return;
-
-    // Reset status to checking on reload or refresh
-    setJessieStatus('Checking...');
 
     // Run connection test to check GenAI inference point response
     const runConnectionCheck = async () => {
@@ -38,19 +71,44 @@ export function DashboardTab({ isOpen }: DashboardTabProps) {
         setJessieStatus('Key Missing');
         return;
       }
+
+      const now = Date.now();
+      if (cachedJessieStatus && (now - lastCheckedTime < 30000)) {
+        setJessieStatus(cachedJessieStatus);
+        return;
+      }
+
+      setJessieStatus('Checking...');
+
       try {
         // Lightweight embedding call pings the GenAI API to see if it returns 200 OK
         await embedText("telemetry_ping", "RETRIEVAL_QUERY");
+        cachedJessieStatus = '200 OK';
+        lastCheckedTime = Date.now();
         setJessieStatus('200 OK');
       } catch (err) {
         console.error("Telemetry API connection test failed:", err);
+        cachedJessieStatus = 'Offline';
+        lastCheckedTime = Date.now();
         setJessieStatus('Offline');
       }
     };
     runConnectionCheck();
 
-    // Load memories
+    // Load memories and chats string representations to check cache eligibility
     const memoriesStr = localStorage.getItem('physica_ai_memories');
+    const chatsStr = localStorage.getItem('physica_ai_chats');
+
+    if (
+      cachedStats &&
+      cachedMemoriesStr === memoriesStr &&
+      cachedChatsStr === chatsStr
+    ) {
+      setStats(cachedStats);
+      return;
+    }
+
+    // Load memories
     let memoriesList: any[] = [];
     if (memoriesStr) {
       try {
@@ -61,7 +119,6 @@ export function DashboardTab({ isOpen }: DashboardTabProps) {
     }
 
     // Load chats
-    const chatsStr = localStorage.getItem('physica_ai_chats');
     let chatsList: any[] = [];
     if (chatsStr) {
       try {
@@ -161,7 +218,7 @@ export function DashboardTab({ isOpen }: DashboardTabProps) {
       }
     }
 
-    setStats({
+    const computedStats: StatsType = {
       memoriesCount: memoriesList.length,
       chatsCount: chatsList.length,
       allTimeMessages,
@@ -171,7 +228,13 @@ export function DashboardTab({ isOpen }: DashboardTabProps) {
       filesAnalyzed: totalFilesAnalyzed,
       webSearches: totalWebSearches,
       lastMemoryUpdateStr
-    });
+    };
+
+    cachedMemoriesStr = memoriesStr;
+    cachedChatsStr = chatsStr;
+    cachedStats = computedStats;
+
+    setStats(computedStats);
   }, [isOpen, refreshKey]);
 
   // Map header indicator states

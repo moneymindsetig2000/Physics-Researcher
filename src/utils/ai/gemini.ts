@@ -54,7 +54,7 @@ async function callWithRetry<T>(fn: () => Promise<T>, retries = 4, delay = 1500)
  * Generate embedding for a given text using gemini-embedding-2-preview
  */
 export async function embedText(
-  text: string,
+  text: string, 
   taskType: 'RETRIEVAL_QUERY' | 'RETRIEVAL_DOCUMENT'
 ): Promise<number[]> {
   const ai = getAIClient();
@@ -63,7 +63,7 @@ export async function embedText(
     contents: text,
     config: { taskType }
   }));
-
+  
   if (response.embeddings?.[0]?.values) {
     return response.embeddings[0].values;
   }
@@ -79,124 +79,47 @@ export interface PipelineResult {
 
 /**
  * Execute the 10-step memory-retrieval and LLM pipeline sequentially
+ * Line-to-line match with the memory-management repository implementation, modified for strict sequential execution.
  */
 export async function runQueryPipeline(
   userQuery: string,
   memories: MemoryRecord[],
-  mode: 'fast' | 'thinking' | 'deep' = 'thinking',
-  chatHistory: { sender: 'user' | 'ai'; text: string }[] = []
+  thinkingToggleIsHigh: boolean
 ): Promise<PipelineResult> {
   const ai = getAIClient();
-
+  
   // STEP 1 — Reasoning Decision (Gemma 4 31B naturally decides if long-term memory is required)
   let memoryRequired = false;
   let decisionReason = "";
-
+  
   try {
     const decisionResponse = await callWithRetry(() => ai.models.generateContent({
       model: "gemma-4-31b-it",
       contents: `User Message:
 "${userQuery}"
 
-Task:
+Task: Decide whether additional long-term memory/context from past conversations, preference profiles, or research notes is actually needed to answer this request correctly.
 
-Determine whether retrieving long-term memory would meaningfully improve the quality of the response.
+Examples where memory is usually NOT required:
+- Greetings (e.g. "hi", "hello", "good morning")
+- Casual conversation (e.g. "how are you?", "what is your name?")
+- Standalone physics questions (e.g. "Explain string theory", "What is quantum entanglement?")
+- General knowledge (e.g. "Who wrote Hamlet?", "What is the capital of France?")
+- Simple calculations (e.g. "2+2", "15% of 80")
+- One-time requests that do not depend on past info
 
-Long-term memory may contain information such as:
-
-- User preferences
-- Preferred explanation style
-- Preferred mathematical depth
-- Citation preferences
-- Formatting preferences
-- Writing preferences
+Examples where memory IS likely required:
+- Follow-up questions or requests referencing past events/conversations (e.g. "What did we talk about earlier?", "Do you remember my paper?")
+- User preferences (e.g. "How did I want my citations formatted?", "Summarize this according to my preferences")
 - Ongoing research projects
-- Previously stored research notes
-- Previous conversations
-- Any other durable information intentionally saved for future use
-
-Your objective is NOT to determine whether the user is asking a follow-up question.
-
-Instead, determine whether retrieving stored memories would produce a noticeably better, more personalized, more consistent, or more context-aware response.
-
-Memory SHOULD be retrieved whenever it is likely to improve:
-
-- Explanation style
-- Mathematical detail
-- Formatting
-- Citation style
-- Personalization
-- Research continuity
-- Ongoing projects
-- Previously discussed work
-- Any response that benefits from remembering the user
-
-Examples where memory is usually REQUIRED:
-
-- Explaining physics concepts
-  (Saved explanation preferences may improve the answer.)
-
-- Solving mathematical or physics problems
-  (Saved derivation or formatting preferences may improve the response.)
-
-- Summarizing research papers
-  (Saved summary style or citation preferences may improve the output.)
-
-- Literature reviews
-
-- Research discussions
-
-- Questions about ongoing projects
-
-- Follow-up requests
-
-- "Continue", "Keep going", or similar requests
-
-- Requests referencing previous conversations
-
-- Requests involving saved preferences
-
-- Requests where long-term context would noticeably improve the final response.
-
-Memory is usually NOT required when:
-
-- Greetings
-  (e.g. "Hi", "Hello", "Good morning")
-
-- Casual conversation
-  (e.g. "How are you?", "What's your name?")
-
-- Very simple arithmetic
-  (e.g. "2 + 2", "15% of 80")
-
-- Extremely short factual questions where personalization would not change the answer.
-
-- Requests that are completely self-contained AND would produce essentially the same response regardless of any stored memories.
-
-Decision Rules:
-
-1. Do NOT retrieve memory simply because memories exist.
-
-2. Do NOT retrieve memory for every request.
-
-3. Retrieve memory whenever it would improve personalization, continuity, explanation quality, or research assistance.
-
-4. If retrieved memories would noticeably improve the response, return memoryRequired = true.
-
-5. If the response would be essentially identical without memory, return memoryRequired = false.
-
-6. When uncertain, ask yourself:
-   "Would retrieving long-term memory make this response better for this specific user?"
-
-   If YES → memoryRequired = true
-
-   If NO → memoryRequired = false
+- Citation preferences
+- "Continue..." or "Keep going" type requests
+- Anything depending on previously stored information
 
 Respond ONLY as a JSON object:
-
 {
   "memoryRequired": boolean,
-  "reason": "A concise 1–2 sentence explanation describing why memory retrieval would or would not improve the response."
+  "reason": "A short, concise explanation (1-2 sentences) of why memory/context is or is not required."
 }`,
       config: {
         thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
@@ -219,7 +142,6 @@ Respond ONLY as a JSON object:
     }
   } catch (error) {
     console.error("Error making memory requirement reasoning decision:", error);
-    // Fallback to true to be safe
     memoryRequired = true;
     decisionReason = "Fallback due to decision error.";
   }
@@ -235,16 +157,14 @@ Respond ONLY as a JSON object:
   let builtSystemInstruction = "";
 
   if (memoryRequired) {
-    // Step 1: Embed the user's query
     queryVector = await embedText(userQuery, "RETRIEVAL_QUERY");
-
-    // Steps 2-6: Rank memories (Semantic search, keyword overlap, score fusion, importance/recency boosts, filtering)
     const rankResult = rankMemories(userQuery, queryVector, memories);
     scoredList = rankResult.scoredList;
     candidatePool = rankResult.candidatePool;
-
-    // NEW STEP: LLM Relevance Reranker (evaluated in ThinkingLevel.MINIMAL, independently and in parallel on candidate pool only)
-    const rerankerPromises = candidatePool.map(async (item) => {
+    
+    // LLM Relevance Reranker (evaluated in ThinkingLevel.MINIMAL, strictly sequential to prevent parallel 500 crashes)
+    const rerankerResults = [];
+    for (const item of candidatePool) {
       const mem = item.memory;
       const finalRankScore = item.finalRankScore;
       try {
@@ -255,26 +175,11 @@ Candidate Memory:
 Title:
 ${mem.title}
 
-Category:
-${mem.category}
-
-Description:
-${mem.description}
-
 Memory:
 ${mem.memory}
 
-Task:
-
-Determine whether this memory should be included in Jessie's active context for answering the current user request.
-
-Only evaluate THIS single memory.
-
-A memory is considered relevant only if including it would genuinely improve the quality, accuracy, personalization, continuity, formatting, reasoning, or completeness of the current response.
-
-Think carefully before approving a memory. A false positive is worse than a false negative because unnecessary memories increase context size, cost, and may influence the final answer in unwanted ways.
-
-Respond ONLY as valid JSON.
+Determine whether this memory would genuinely help answer the user's request.
+Respond ONLY as JSON.
 
 Schema:
 {
@@ -283,63 +188,13 @@ Schema:
   "reason": string
 }
 
-Evaluation Rules:
-
-1. User Preferences
-- Always mark as relevant if the preference changes how Jessie should answer.
-- Examples:
-  - explanation style
-  - citation format
-  - response formatting
-  - mathematical detail
-  - language preference
-  - teaching style
-
-2. Ongoing Projects
-- Only relevant if the current request directly relates to that project.
-- Similar scientific fields alone are NOT enough.
-- Example:
-  User project: Graphene superconductivity
-  User asks: "Find recent graphene superconductivity papers."
-  → Relevant
-
-  User asks: "Explain Quantum Hall Effect."
-  → NOT relevant
-
-3. Research Notes
-- Only include if they provide useful context that materially improves the current answer.
-- Do NOT include unrelated notes simply because they belong to physics.
-
-4. Conversation Continuity
-- If the user references previous work using phrases such as:
-  - continue
-  - previous
-  - earlier
-  - remember
-  - same project
-  - that paper
-  - our discussion
-then related memories are relevant.
-
-5. Personal Facts
-- Include only if they affect the current request.
-
-6. Broad Domain Matching
-- NEVER approve a memory simply because it belongs to physics, science, engineering, mathematics, or another subject area.
-
-7. Similar Vocabulary
-- Shared words alone do NOT make a memory relevant.
-- The underlying intent of the user's request must match the purpose of the memory.
-
-8. Cost Awareness
-- Prefer the minimum number of memories required.
-- If this memory provides no measurable benefit, reject it.
-
-9. Independent Evaluation
-- Ignore all other memories.
-- Judge only this candidate against the current user query.
-
-Return ONLY the JSON object. Do not include markdown, explanations, or additional text.`;
+Rules:
+A memory is relevant only if it would improve the current answer.
+Being in the same broad scientific field is NOT sufficient.
+Do NOT approve memories merely because they mention physics.
+Project memories should only be included if they directly relate to the user's request.
+Research notes should only be included if they materially improve the answer.
+User preferences are always considered relevant whenever they affect response formatting or explanation style.`;
 
         const res = await callWithRetry(() => ai.models.generateContent({
           model: "gemma-4-31b-it",
@@ -361,34 +216,28 @@ Return ONLY the JSON object. Do not include markdown, explanations, or additiona
 
         if (res.text) {
           const parsed = JSON.parse(res.text.trim());
-          return {
+          rerankerResults.push({
             memory: mem,
             finalRankScore,
             relevant: !!parsed.relevant,
             confidence: typeof parsed.confidence === 'number' ? parsed.confidence : 1.0,
             reason: parsed.reason || "Processed successfully."
-          };
+          });
+          continue;
         }
       } catch (error) {
         console.error(`Error reranking memory "${mem.title}":`, error);
       }
-      return {
+      rerankerResults.push({
         memory: mem,
-        finalRankScore,
+        finalRankScore: false,
         relevant: false,
         confidence: 0,
         reason: "LLM Reranker encountered an evaluation error or returned invalid output."
-      };
-    });
+      });
+    }
 
-    const rerankerResults = await Promise.all(rerankerPromises);
-
-    // Filter: must satisfy BOTH conditions:
-    // 1. finalRankScore >= RELEVANCE_THRESHOLD
-    // 2. LLM reranker returned relevant = true
     eligibleCandidates = rerankerResults.filter(r => r.relevant && r.finalRankScore >= RELEVANCE_THRESHOLD);
-
-    // Sort by confidence (highest first), then finalRankScore (highest first)
     const sortedEligible = [...eligibleCandidates].sort((a, b) => {
       if (b.confidence !== a.confidence) {
         return b.confidence - a.confidence;
@@ -396,7 +245,6 @@ Return ONLY the JSON object. Do not include markdown, explanations, or additiona
       return b.finalRankScore - a.finalRankScore;
     });
 
-    // Limit to MAX_CONTEXT_MEMORIES
     const finalSurvivingCandidates = sortedEligible.slice(0, MAX_CONTEXT_MEMORIES);
     finalSurvivingMemories = finalSurvivingCandidates.map(c => c.memory);
 
@@ -418,66 +266,26 @@ Return ONLY the JSON object. Do not include markdown, explanations, or additiona
       finalScore: c.finalRankScore
     }));
 
-    // Step 7: Format system instruction using surviving memories
     builtSystemInstruction = formatSystemInstruction(finalSurvivingMemories);
   } else {
-    // Skipped
     builtSystemInstruction = "";
   }
-
-  // Load dynamic model parameters from localStorage with fallback to file configs
-  const storedTemp = typeof window !== 'undefined' ? localStorage.getItem('physica_ai_temperature') : null;
-  const storedTopP = typeof window !== 'undefined' ? localStorage.getItem('physica_ai_top_p') : null;
-  const storedInstructions = typeof window !== 'undefined' ? localStorage.getItem('physica_ai_custom_instructions') : null;
-
-  const temperature = storedTemp !== null ? parseFloat(storedTemp) : DEFAULT_TEMPERATURE;
-  const topP = storedTopP !== null ? parseFloat(storedTopP) : DEFAULT_TOP_P;
-  const customInstructions = storedInstructions !== null ? storedInstructions : DEFAULT_CUSTOM_INSTRUCTIONS;
-
-  if (customInstructions && customInstructions.trim()) {
-    builtSystemInstruction = builtSystemInstruction 
-      ? `${builtSystemInstruction}\n\nAdditional User Instructions:\n${customInstructions}` 
-      : customInstructions;
-  }
-
-  // Step 8: Call the main reasoning model with web search grounding
+  
+  // Call the main reasoning model with web search grounding (grounding tool active for main model only)
   const mainModel = "gemma-4-31b-it";
-
-  // Build full content array including history for conversational context
-  const apiContents: any[] = [];
-  for (const turn of chatHistory) {
-    if (turn.text && turn.text.trim()) {
-      apiContents.push({
-        role: turn.sender === 'user' ? 'user' : 'model',
-        parts: [{ text: turn.text }]
-      });
-    }
-  }
-  apiContents.push({
-    role: 'user',
-    parts: [{ text: userQuery }]
-  });
-
   const mainResponse = await callWithRetry(() => ai.models.generateContent({
     model: mainModel,
-    contents: apiContents,
+    contents: userQuery,
     config: {
-      // Structured Content object with explicit role:'system' — required by Gemma API to prevent 500 errors
-      systemInstruction: builtSystemInstruction
-        ? { role: 'system', parts: [{ text: builtSystemInstruction }] }
-        : undefined,
-      tools: [{ googleSearch: {} }],
+      systemInstruction: builtSystemInstruction || undefined,
+      tools: undefined,
       thinkingConfig: {
-        thinkingLevel: mode === 'fast' ? ThinkingLevel.MINIMAL : ThinkingLevel.HIGH
-      },
-      temperature,
-      topP
+        thinkingLevel: ThinkingLevel.HIGH
+      }
     }
   }));
-
+  
   const replyText = mainResponse.text || "No response text generated by the model.";
-
-  // Extract Grounding Metadata
   const groundingMetadata = mainResponse.candidates?.[0]?.groundingMetadata;
   const searchQueries = groundingMetadata?.webSearchQueries || [];
   const searchSources = groundingMetadata?.groundingChunks?.map(chunk => ({
@@ -485,135 +293,28 @@ Return ONLY the JSON object. Do not include markdown, explanations, or additiona
     uri: chunk.web?.uri || ""
   })).filter(src => src.uri !== "") || [];
   const searchUsed = !!(searchQueries.length > 0 || searchSources.length > 0);
-
-  // Step 9: Memory Evaluation (Using ThinkingLevel.MINIMAL to keep latency low)
+  
+  // Memory Evaluation (forced to ThinkingLevel.MINIMAL, separate call, JSON schema)
   let evalResult = {
     shouldSave: false,
     shouldDelete: false,
     deleteMemoryTitle: "",
-    reason: "No evaluation processed."
+    reason: "No evaluation processed.",
+    title: "",
+    description: "",
+    category: "",
+    memory: "",
+    importance: 5
   };
-  let newMemoryCreated: any = undefined;
+  let newMemoryCreated: MemoryRecord | undefined = undefined;
   let deletedMemoryId: string | undefined = undefined;
-
+  
   try {
     const memorySummaryText = memories.map(m => `- ID: "${m.id}", Title: "${m.title}", Memory content: "${m.memory}"`).join("\n");
+    const cleanedReplyText = replyText.length > 1000 ? replyText.slice(0, 1000) + "... [truncated]" : replyText;
     const evalResponse = await callWithRetry(() => ai.models.generateContent({
       model: mainModel,
-      contents: `User said:
-"${userQuery}"
-
-Assistant replied:
-"${replyText}"
-
-All existing memories currently stored in the memory bank:
-${memorySummaryText || "None"}
-
-You are Jessie's Long-Term Memory Manager.
-
-Your responsibility is to decide whether this conversation should modify Jessie's long-term memory.
-
-Long-term memory should contain only durable information that is likely to improve future conversations.
-
-Tasks:
-
-1. Determine whether a NEW memory should be created.
-2. Determine whether an EXISTING memory should be deleted.
-3. If neither action is required, leave both as false.
-4. Explain your decision briefly in the "reason" field.
-
-A memory SHOULD be saved only if the user provides durable information such as:
-
-• Long-term preferences
-  Examples:
-  - "Always explain equations step-by-step."
-  - "Use APS citations."
-  - "Answer in simple English."
-  - "From now on..."
-
-• Ongoing research projects
-  Examples:
-  - "I'm working on graphene superconductivity."
-  - "My thesis is about plasma physics."
-
-• Long-term personal working context
-  Examples:
-  - Preferred formatting
-  - Writing style
-  - Citation style
-  - Teaching preference
-  - Permanent workflow instructions
-
-A memory should NOT be saved for:
-
-• Greetings
-• One-time questions
-• Temporary requests
-• Single explanations
-• Short conversations
-• Information already contained in existing memories
-• Facts that are only relevant to the current conversation
-• Assistant-generated content
-• Web search results
-• Temporary research findings
-
-Before saving a memory:
-
-- Compare it against the existing memory list.
-- If an equivalent memory already exists, do NOT create a duplicate.
-- If the new information updates an existing memory, prefer replacing or deleting the old version instead of creating multiple conflicting memories.
-
-Deletion Rules:
-
-Delete a memory ONLY if the user explicitly requests it.
-
-Examples:
-- "Forget my citation preference."
-- "Delete my graphene project."
-- "Remove my explanation preference."
-
-Never delete memories automatically.
-Never infer deletion from context.
-
-If deletion is requested, set deleteMemoryTitle to the EXACT memory title or ID from the memory list above.
-
-If shouldSave is true, generate:
-
-- title
-- description
-- category
-- memory
-- importance (0-10)
-
-Guidelines for generated memory fields:
-
-title:
-A short unique title.
-
-description:
-One concise sentence describing the memory.
-
-category:
-Examples:
-- User Preference
-- Research Project
-- Research Notes
-- Writing Preference
-- Citation Preference
-- Other
-
-memory:
-Store only the durable information itself.
-Do not include unnecessary wording.
-
-importance:
-0–3 = Low future value
-4–6 = Useful
-7–8 = Important
-9–10 = Critical long-term preference or project
-
-Respond ONLY as valid JSON matching the required schema.
-Do not include markdown or any additional explanation.`,
+      contents: `User said: "${userQuery}"\nAssistant replied: "${cleanedReplyText}"\n\nAll existing memories currently stored in the memory bank:\n${memorySummaryText || "None"}\n\nTask:\n1. Did the user state a new durable, reusable preference, fact, or project detail that should be saved? Set shouldSave to true.\n2. Did the user explicitly ask to delete, forget, or remove a previously saved memory/fact? Set shouldDelete to true, and set deleteMemoryTitle to the EXACT title or ID of that memory from the database list above.\n3. Provide the reason for your evaluation in the "reason" field.`,
       config: {
         thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
         responseMimeType: "application/json",
@@ -634,20 +335,15 @@ Do not include markdown or any additional explanation.`,
         }
       }
     }));
-
+    
     if (evalResponse.text) {
       const parsed = JSON.parse(evalResponse.text.trim());
-      evalResult = {
-        shouldSave: !!parsed.shouldSave,
-        shouldDelete: !!parsed.shouldDelete,
-        deleteMemoryTitle: parsed.deleteMemoryTitle || "",
-        reason: parsed.reason || ""
-      };
-
+      evalResult = { ...evalResult, ...parsed };
+      
       if (evalResult.shouldDelete && evalResult.deleteMemoryTitle) {
         const queryClean = evalResult.deleteMemoryTitle.trim().toLowerCase();
-        const matched = memories.find(m =>
-          m.id.toLowerCase() === queryClean ||
+        const matched = memories.find(m => 
+          m.id.toLowerCase() === queryClean || 
           m.title.toLowerCase() === queryClean ||
           m.title.toLowerCase().includes(queryClean) ||
           queryClean.includes(m.title.toLowerCase())
@@ -657,19 +353,19 @@ Do not include markdown or any additional explanation.`,
         }
       }
 
-      if (evalResult.shouldSave && parsed.memory) {
-        const memoryVector = await embedText(parsed.memory, "RETRIEVAL_DOCUMENT");
-        const randomIdSuffix = typeof crypto?.randomUUID === 'function'
-          ? crypto.randomUUID().slice(0, 8)
+      if (evalResult.shouldSave && evalResult.memory) {
+        const memoryVector = await embedText(evalResult.memory, "RETRIEVAL_DOCUMENT");
+        const randomIdSuffix = typeof crypto?.randomUUID === 'function' 
+          ? crypto.randomUUID().slice(0, 8) 
           : Math.random().toString(36).substring(2, 10);
-
+          
         newMemoryCreated = {
           id: "mem_" + randomIdSuffix,
-          title: parsed.title || "User Preference Note",
-          description: parsed.description || "Inferred from conversation.",
-          category: parsed.category || "General",
-          memory: parsed.memory,
-          importance: typeof parsed.importance === 'number' ? Math.max(0, Math.min(10, parsed.importance)) : 5,
+          title: evalResult.title || "User Preference Note",
+          description: evalResult.description || "Inferred from conversation.",
+          category: evalResult.category || "General",
+          memory: evalResult.memory,
+          importance: typeof evalResult.importance === 'number' ? Math.max(0, Math.min(10, evalResult.importance)) : 5,
           createdAt: Date.now(),
           embedding: memoryVector
         };
@@ -679,8 +375,7 @@ Do not include markdown or any additional explanation.`,
     console.error("Memory evaluation step encountered an error:", err);
     evalResult.reason = "Evaluation step error: " + (err instanceof Error ? err.message : String(err));
   }
-
-  // Construct the trace record to return to UI
+  
   const trace: TraceRecord = {
     queryText: userQuery,
     queryEmbeddingLength: queryVector.length,
@@ -689,7 +384,7 @@ Do not include markdown or any additional explanation.`,
     searchUsed,
     searchQueries,
     searchSources,
-    thinkingLevel: mode,
+    thinkingLevel: thinkingToggleIsHigh ? 'High' : 'Minimal',
     evalResult: {
       shouldSave: evalResult.shouldSave,
       shouldDelete: evalResult.shouldDelete,
@@ -718,7 +413,7 @@ Do not include markdown or any additional explanation.`,
     memoryRequired,
     decisionReason
   };
-
+  
   return {
     replyText,
     trace,
@@ -728,75 +423,12 @@ Do not include markdown or any additional explanation.`,
 }
 
 /**
- * Parses raw streamed model text to extract tags like <thought>, <think>, or <|channel>thought.
- */
-export function parseTextForThoughts(rawText: string): { text: string; thought: string } {
-  let text = rawText;
-  let thought = "";
-
-  // 1. Check for <thought>...</thought> tags
-  const thoughtRegex = /<thought>([\s\S]*?)<\/thought>/gi;
-  if (thoughtRegex.test(text)) {
-    text = text.replace(thoughtRegex, (_, p1) => {
-      thought += (thought ? "\n" : "") + p1;
-      return "";
-    });
-  } else {
-    // If the tag is opened but not closed yet (streaming)
-    const openThoughtRegex = /<thought>([\s\S]*)$/i;
-    const match = text.match(openThoughtRegex);
-    if (match) {
-      thought = match[1];
-      text = text.replace(openThoughtRegex, "");
-    }
-  }
-
-  // 2. Check for <|channel>thought ... <channel|> tags
-  const channelRegex = /<\|channel>thought([\s\S]*?)<channel\|>/gi;
-  if (channelRegex.test(text)) {
-    text = text.replace(channelRegex, (_, p1) => {
-      thought += (thought ? "\n" : "") + p1;
-      return "";
-    });
-  } else {
-    // If opened but not closed yet
-    const openChannelRegex = /<\|channel>thought([\s\S]*)$/i;
-    const match = text.match(openChannelRegex);
-    if (match) {
-      thought = thought || match[1];
-      text = text.replace(openChannelRegex, "");
-    }
-  }
-
-  // 3. Check for standard <think>...</think> tags (like DeepSeek)
-  const thinkRegex = /<think>([\s\S]*?)<\/think>/gi;
-  if (thinkRegex.test(text)) {
-    text = text.replace(thinkRegex, (_, p1) => {
-      thought += (thought ? "\n" : "") + p1;
-      return "";
-    });
-  } else {
-    const openThinkRegex = /<think>([\s\S]*)$/i;
-    const match = text.match(openThinkRegex);
-    if (match) {
-      thought = thought || match[1];
-      text = text.replace(openThinkRegex, "");
-    }
-  }
-
-  return {
-    text: text,
-    thought: thought
-  };
-}
-
-/**
- * Execute the 10-step memory-retrieval and LLM pipeline sequentially with streaming response
+ * Execute the 10-step memory-retrieval and LLM pipeline sequentially with streaming response.
+ * Uses exact prompts, models, and steps from the memory-management workflow, with sequential execution to prevent 500s.
  */
 export async function runQueryPipelineStream(
   userQuery: string,
   memories: MemoryRecord[],
-  mode: 'fast' | 'thinking' | 'deep' = 'thinking',
   onChunk: (data: { text: string; thought: string }) => void,
   chatHistory: { sender: 'user' | 'ai'; text: string }[] = []
 ): Promise<PipelineResult> {
@@ -812,105 +444,28 @@ export async function runQueryPipelineStream(
       contents: `User Message:
 "${userQuery}"
 
-Task:
+Task: Decide whether additional long-term memory/context from past conversations, preference profiles, or research notes is actually needed to answer this request correctly.
 
-Determine whether retrieving long-term memory would meaningfully improve the quality of the response.
+Examples where memory is usually NOT required:
+- Greetings (e.g. "hi", "hello", "good morning")
+- Casual conversation (e.g. "how are you?", "what is your name?")
+- Standalone physics questions (e.g. "Explain string theory", "What is quantum entanglement?")
+- General knowledge (e.g. "Who wrote Hamlet?", "What is the capital of France?")
+- Simple calculations (e.g. "2+2", "15% of 80")
+- One-time requests that do not depend on past info
 
-Long-term memory may contain information such as:
-
-- User preferences
-- Preferred explanation style
-- Preferred mathematical depth
-- Citation preferences
-- Formatting preferences
-- Writing preferences
+Examples where memory IS likely required:
+- Follow-up questions or requests referencing past events/conversations (e.g. "What did we talk about earlier?", "Do you remember my paper?")
+- User preferences (e.g. "How did I want my citations formatted?", "Summarize this according to my preferences")
 - Ongoing research projects
-- Previously stored research notes
-- Previous conversations
-- Any other durable information intentionally saved for future use
-
-Your objective is NOT to determine whether the user is asking a follow-up question.
-
-Instead, determine whether retrieving stored memories would produce a noticeably better, more personalized, more consistent, or more context-aware response.
-
-Memory SHOULD be retrieved whenever it is likely to improve:
-
-- Explanation style
-- Mathematical detail
-- Formatting
-- Citation style
-- Personalization
-- Research continuity
-- Ongoing projects
-- Previously discussed work
-- Any response that benefits from remembering the user
-
-Examples where memory is usually REQUIRED:
-
-- Explaining physics concepts
-  (Saved explanation preferences may improve the answer.)
-
-- Solving mathematical or physics problems
-  (Saved derivation or formatting preferences may improve the response.)
-
-- Summarizing research papers
-  (Saved summary style or citation preferences may improve the output.)
-
-- Literature reviews
-
-- Research discussions
-
-- Questions about ongoing projects
-
-- Follow-up requests
-
-- "Continue", "Keep going", or similar requests
-
-- Requests referencing previous conversations
-
-- Requests involving saved preferences
-
-- Requests where long-term context would noticeably improve the final response.
-
-Memory is usually NOT required when:
-
-- Greetings
-  (e.g. "Hi", "Hello", "Good morning")
-
-- Casual conversation
-  (e.g. "How are you?", "What's your name?")
-
-- Very simple arithmetic
-  (e.g. "2 + 2", "15% of 80")
-
-- Extremely short factual questions where personalization would not change the answer.
-
-- Requests that are completely self-contained AND would produce essentially the same response regardless of any stored memories.
-
-Decision Rules:
-
-1. Do NOT retrieve memory simply because memories exist.
-
-2. Do NOT retrieve memory for every request.
-
-3. Retrieve memory whenever it would improve personalization, continuity, explanation quality, or research assistance.
-
-4. If retrieved memories would noticeably improve the response, return memoryRequired = true.
-
-5. If the response would be essentially identical without memory, return memoryRequired = false.
-
-6. When uncertain, ask yourself:
-   "Would retrieving long-term memory make this response better for this specific user?"
-
-   If YES → memoryRequired = true
-
-   If NO → memoryRequired = false
+- Citation preferences
+- "Continue..." or "Keep going" type requests
+- Anything depending on previously stored information
 
 Respond ONLY as a JSON object:
-
 {
   "memoryRequired": boolean,
-  "reason": "A concise 1–2 sentence explanation describing why memory retrieval would or would not improve the response."
+  "reason": "A short, concise explanation (1-2 sentences) of why memory/context is or is not required."
 }`,
       config: {
         thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
@@ -953,7 +508,9 @@ Respond ONLY as a JSON object:
     scoredList = rankResult.scoredList;
     candidatePool = rankResult.candidatePool;
 
-    const rerankerPromises = candidatePool.map(async (item) => {
+    // LLM Relevance Reranker (evaluated sequentially one by one to prevent parallel API 500 errors)
+    const rerankerResults = [];
+    for (const item of candidatePool) {
       const mem = item.memory;
       const finalRankScore = item.finalRankScore;
       try {
@@ -964,26 +521,11 @@ Candidate Memory:
 Title:
 ${mem.title}
 
-Category:
-${mem.category}
-
-Description:
-${mem.description}
-
 Memory:
 ${mem.memory}
 
-Task:
-
-Determine whether this memory should be included in Jessie's active context for answering the current user request.
-
-Only evaluate THIS single memory.
-
-A memory is considered relevant only if including it would genuinely improve the quality, accuracy, personalization, continuity, formatting, reasoning, or completeness of the current response.
-
-Think carefully before approving a memory. A false positive is worse than a false negative because unnecessary memories increase context size, cost, and may influence the final answer in unwanted ways.
-
-Respond ONLY as valid JSON.
+Determine whether this memory would genuinely help answer the user's request.
+Respond ONLY as JSON.
 
 Schema:
 {
@@ -992,63 +534,13 @@ Schema:
   "reason": string
 }
 
-Evaluation Rules:
-
-1. User Preferences
-- Always mark as relevant if the preference changes how Jessie should answer.
-- Examples:
-  - explanation style
-  - citation format
-  - response formatting
-  - mathematical detail
-  - language preference
-  - teaching style
-
-2. Ongoing Projects
-- Only relevant if the current request directly relates to that project.
-- Similar scientific fields alone are NOT enough.
-- Example:
-  User project: Graphene superconductivity
-  User asks: "Find recent graphene superconductivity papers."
-  → Relevant
-
-  User asks: "Explain Quantum Hall Effect."
-  → NOT relevant
-
-3. Research Notes
-- Only include if they provide useful context that materially improves the current answer.
-- Do NOT include unrelated notes simply because they belong to physics.
-
-4. Conversation Continuity
-- If the user references previous work using phrases such as:
-  - continue
-  - previous
-  - earlier
-  - remember
-  - same project
-  - that paper
-  - our discussion
-then related memories are relevant.
-
-5. Personal Facts
-- Include only if they affect the current request.
-
-6. Broad Domain Matching
-- NEVER approve a memory simply because it belongs to physics, science, engineering, mathematics, or another subject area.
-
-7. Similar Vocabulary
-- Shared words alone do NOT make a memory relevant.
-- The underlying intent of the user's request must match the purpose of the memory.
-
-8. Cost Awareness
-- Prefer the minimum number of memories required.
-- If this memory provides no measurable benefit, reject it.
-
-9. Independent Evaluation
-- Ignore all other memories.
-- Judge only this candidate against the current user query.
-
-Return ONLY the JSON object. Do not include markdown, explanations, or additional text.`;
+Rules:
+A memory is relevant only if it would improve the current answer.
+Being in the same broad scientific field is NOT sufficient.
+Do NOT approve memories merely because they mention physics.
+Project memories should only be included if they directly relate to the user's request.
+Research notes should only be included if they materially improve the answer.
+User preferences are always considered relevant whenever they affect response formatting or explanation style.`;
 
         const res = await callWithRetry(() => ai.models.generateContent({
           model: "gemma-4-31b-it",
@@ -1070,27 +562,28 @@ Return ONLY the JSON object. Do not include markdown, explanations, or additiona
 
         if (res.text) {
           const parsed = JSON.parse(res.text.trim());
-          return {
+          rerankerResults.push({
             memory: mem,
             finalRankScore,
             relevant: !!parsed.relevant,
             confidence: typeof parsed.confidence === 'number' ? parsed.confidence : 1.0,
             reason: parsed.reason || "Processed successfully."
-          };
+          });
+          continue;
         }
       } catch (error) {
         console.error(`Error reranking memory "${mem.title}":`, error);
       }
-      return {
+      
+      rerankerResults.push({
         memory: mem,
-        finalRankScore,
+        finalRankScore: false,
         relevant: false,
         confidence: 0,
         reason: "LLM Reranker encountered an evaluation error or returned invalid output."
-      };
-    });
+      });
+    }
 
-    const rerankerResults = await Promise.all(rerankerPromises);
     eligibleCandidates = rerankerResults.filter(r => r.relevant && r.finalRankScore >= RELEVANCE_THRESHOLD);
     const sortedEligible = [...eligibleCandidates].sort((a, b) => {
       if (b.confidence !== a.confidence) {
@@ -1121,6 +614,8 @@ Return ONLY the JSON object. Do not include markdown, explanations, or additiona
     }));
 
     builtSystemInstruction = formatSystemInstruction(finalSurvivingMemories);
+  } else {
+    builtSystemInstruction = "";
   }
 
   // Load dynamic model parameters from localStorage with fallback to file configs
@@ -1132,126 +627,153 @@ Return ONLY the JSON object. Do not include markdown, explanations, or additiona
   const topP = storedTopP !== null ? parseFloat(storedTopP) : DEFAULT_TOP_P;
   const customInstructions = storedInstructions !== null ? storedInstructions : DEFAULT_CUSTOM_INSTRUCTIONS;
 
+  // Format conversation history for single-turn robustness to prevent tool use 500 errors
+  let historyContext = "";
+  if (chatHistory && chatHistory.length > 0) {
+    historyContext = "Recent Conversation History:\n" + chatHistory.map(turn => {
+      const senderName = turn.sender === 'user' ? 'User' : 'Assistant';
+      return `${senderName}: ${turn.text}`;
+    }).join("\n") + "\n\n";
+  }
+
+  // Append user custom instructions to the final builtSystemInstruction
+  let finalSystemInstruction = builtSystemInstruction;
   if (customInstructions && customInstructions.trim()) {
-    builtSystemInstruction = builtSystemInstruction 
-      ? `${builtSystemInstruction}\n\nAdditional User Instructions:\n${customInstructions}` 
+    finalSystemInstruction = finalSystemInstruction 
+      ? `${finalSystemInstruction}\n\nAdditional Instructions:\n${customInstructions}`
       : customInstructions;
   }
 
-  // Step 8: Call the main reasoning model with web search grounding (STREAMING)
+  if (historyContext) {
+    finalSystemInstruction = finalSystemInstruction
+      ? `${historyContext}${finalSystemInstruction}`
+      : historyContext;
+  }
+
+  // Call the main reasoning model with web search grounding (STREAMING)
   const mainModel = "gemma-4-31b-it";
-  let replyText = "";
-  let accumulatedThought = "";
   let searchUsed = false;
   let searchQueries: string[] = [];
   let searchSources: any[] = [];
+  let replyText = "";
+  let accumulatedThought = "";
 
-  // Throttle callback to at most once per 200ms to eliminate UI scroll lag during streaming
-  let lastCallbackTime = 0;
-  let pendingChunk: { text: string; thought: string } | null = null;
-  let throttleTimeout: any = null;
+  // Single-turn payload to bypass Google API's multi-turn tool validation crashes
+  const apiContents = [
+    {
+      role: 'user',
+      parts: [{ text: userQuery }]
+    }
+  ];
 
-  const throttledOnChunk = (text: string, thought: string, force = false) => {
-    pendingChunk = { text, thought };
-    const now = Date.now();
+  // Setup throttling for smooth chunks streaming (Apple aesthetic UX)
+  let pendingText = "";
+  let pendingThought = "";
+  let throttleTimeout: NodeJS.Timeout | null = null;
 
-    if (force || now - lastCallbackTime >= 200) {
-      if (throttleTimeout) {
-        clearTimeout(throttleTimeout);
-        throttleTimeout = null;
-      }
-      onChunk({ text, thought });
-      lastCallbackTime = now;
-      pendingChunk = null;
-    } else if (!throttleTimeout) {
+  const throttledOnChunk = (text: string, thought: string) => {
+    pendingText = text;
+    pendingThought = thought;
+
+    if (!throttleTimeout) {
       throttleTimeout = setTimeout(() => {
-        if (pendingChunk) {
-          onChunk(pendingChunk);
-          lastCallbackTime = Date.now();
-          pendingChunk = null;
-        }
+        onChunk({ text: pendingText, thought: pendingThought });
         throttleTimeout = null;
-      }, 200 - (now - lastCallbackTime));
+      }, 35); // ~30 fps update rate for buttery smooth rendering
     }
   };
 
-  // Build full content array including history for conversational context
-  const apiContents: any[] = [];
-  for (const turn of chatHistory) {
-    if (turn.text && turn.text.trim()) {
-      apiContents.push({
-        role: turn.sender === 'user' ? 'user' : 'model',
-        parts: [{ text: turn.text }]
-      });
-    }
-  }
-  apiContents.push({
-    role: 'user',
-    parts: [{ text: userQuery }]
-  });
+  let streamRetries = 3;
+  let streamSuccess = false;
+  let useSearchTool = true;
 
-  try {
-    const responseStream = await callWithRetry(() => ai.models.generateContentStream({
-      model: mainModel,
-      contents: apiContents,
-      config: {
-        // Structured Content object with explicit role:'system' — required by Gemma API to prevent 500 errors
-        systemInstruction: builtSystemInstruction
-          ? { role: 'system', parts: [{ text: builtSystemInstruction }] }
-          : undefined,
-        tools: [{ googleSearch: {} }],
-        thinkingConfig: {
-          thinkingLevel: mode === 'fast' ? ThinkingLevel.MINIMAL : ThinkingLevel.HIGH
-        },
-        temperature,
-        topP
-      }
-    }));
+  while (streamRetries > 0 && !streamSuccess) {
+    try {
+      // Reset buffers on retry
+      replyText = "";
+      accumulatedThought = "";
 
-    for await (const chunk of responseStream) {
-      const groundingMetadata = chunk.candidates?.[0]?.groundingMetadata;
-      if (groundingMetadata) {
-        searchUsed = searchUsed || !!(groundingMetadata.webSearchQueries && groundingMetadata.webSearchQueries.length > 0);
-        if (groundingMetadata.webSearchQueries) {
-          searchQueries = Array.from(new Set([...searchQueries, ...groundingMetadata.webSearchQueries]));
+      const responseStream = await callWithRetry(() => ai.models.generateContentStream({
+        model: mainModel,
+        contents: apiContents,
+        config: {
+          systemInstruction: finalSystemInstruction 
+            ? { role: 'system', parts: [{ text: finalSystemInstruction }] }
+            : undefined,
+          tools: useSearchTool ? [{ googleSearch: {} }] : undefined,
+          thinkingConfig: {
+            thinkingLevel: ThinkingLevel.HIGH
+          },
+          temperature,
+          topP
         }
-        if (groundingMetadata.groundingChunks) {
-          const chunksMapped = groundingMetadata.groundingChunks.map(c => ({
-            title: c.web?.title || c.web?.uri || "Web Source",
-            uri: c.web?.uri || ""
-          })).filter(src => src.uri !== "");
-          searchSources = [...searchSources, ...chunksMapped];
-        }
-      }
+      }));
 
-      const candidates = chunk.candidates;
-      if (candidates?.[0]?.content?.parts) {
-        for (const part of candidates[0].content.parts) {
-          if (part.thought) {
-            accumulatedThought += part.text || "";
-          } else if (part.text) {
-            replyText += part.text || "";
+      for await (const chunk of responseStream) {
+        const groundingMetadata = chunk.candidates?.[0]?.groundingMetadata;
+        if (groundingMetadata) {
+          searchUsed = searchUsed || !!(groundingMetadata.webSearchQueries && groundingMetadata.webSearchQueries.length > 0);
+          if (groundingMetadata.webSearchQueries) {
+            searchQueries = Array.from(new Set([...searchQueries, ...groundingMetadata.webSearchQueries]));
+          }
+          if (groundingMetadata.groundingChunks) {
+            const chunksMapped = groundingMetadata.groundingChunks.map(c => ({
+              title: c.web?.title || c.web?.uri || "Web Source",
+              uri: c.web?.uri || ""
+            })).filter(src => src.uri !== "");
+            searchSources = [...searchSources, ...chunksMapped];
           }
         }
+
+        const candidates = chunk.candidates;
+        if (candidates?.[0]?.content?.parts) {
+          for (const part of candidates[0].content.parts) {
+            if (part.thought) {
+              accumulatedThought += part.text || "";
+            } else if (part.text) {
+              replyText += part.text || "";
+            }
+          }
+        }
+
+        let parsedText = replyText;
+        let parsedThought = accumulatedThought;
+        if (!accumulatedThought && replyText) {
+          const parsed = parseTextForThoughts(replyText);
+          parsedText = parsed.text;
+          parsedThought = parsed.thought;
+        }
+
+        throttledOnChunk(parsedText, parsedThought);
+      }
+      
+      streamSuccess = true;
+    } catch (err: any) {
+      streamRetries--;
+      const errStr = String(err);
+      
+      // If it is a 500 error and we were using the search tool, fallback to no-search
+      if (useSearchTool && (errStr.includes("500") || errStr.includes("INTERNAL"))) {
+        console.warn("Google Search grounding failed on Gemma model with 500 error. Falling back to search-disabled request...");
+        useSearchTool = false;
+        streamRetries++; // Don't consume a retry attempt for the fallback trigger
+        continue;
       }
 
-      // Parse tags inside replyText if we don't have native thoughts
-      let parsedText = replyText;
-      let parsedThought = accumulatedThought;
-      if (!accumulatedThought && replyText) {
-        const parsed = parseTextForThoughts(replyText);
-        parsedText = parsed.text;
-        parsedThought = parsed.thought;
+      const isRetryable = errStr.includes("503") || errStr.includes("500") || errStr.includes("UNAVAILABLE") || errStr.includes("INTERNAL") || errStr.includes("RESOURCE_EXHAUSTED");
+      
+      if (streamRetries > 0 && isRetryable) {
+        console.warn(`Streaming failed due to service instability. Retrying stream from start in 1500ms... (${streamRetries} attempts left). Error:`, err);
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        continue;
       }
 
-      throttledOnChunk(parsedText, parsedThought);
+      if (throttleTimeout) {
+        clearTimeout(throttleTimeout);
+      }
+      console.error("Error during streaming generation:", err);
+      throw err;
     }
-  } catch (err) {
-    if (throttleTimeout) {
-      clearTimeout(throttleTimeout);
-    }
-    console.error("Error during streaming generation:", err);
-    throw err;
   }
 
   if (throttleTimeout) {
@@ -1266,10 +788,8 @@ Return ONLY the JSON object. Do not include markdown, explanations, or additiona
     return true;
   });
 
-  // Ensure searchUsed is computed dynamically
   searchUsed = searchUsed || searchQueries.length > 0 || searchSources.length > 0;
 
-  // Re-run regex parser at the end to clean tags completely
   let finalReplyText = replyText;
   let finalThought = accumulatedThought;
   if (!accumulatedThought && replyText) {
@@ -1278,137 +798,29 @@ Return ONLY the JSON object. Do not include markdown, explanations, or additiona
     finalThought = parsed.thought;
   }
 
-  // Force invoke the final exact state
   onChunk({ text: finalReplyText, thought: finalThought });
 
-  // Step 9: Memory Evaluation (Using ThinkingLevel.MINIMAL to keep latency low)
+  // STEP 10: Memory Evaluation (forced to ThinkingLevel.MINIMAL, separate call, JSON schema)
   let evalResult = {
     shouldSave: false,
     shouldDelete: false,
     deleteMemoryTitle: "",
-    reason: "No evaluation processed."
+    reason: "No evaluation processed.",
+    title: "",
+    description: "",
+    category: "",
+    memory: "",
+    importance: 5
   };
-  let newMemoryCreated: any = undefined;
+  let newMemoryCreated: MemoryRecord | undefined = undefined;
   let deletedMemoryId: string | undefined = undefined;
 
   try {
     const memorySummaryText = memories.map(m => `- ID: "${m.id}", Title: "${m.title}", Memory content: "${m.memory}"`).join("\n");
-    const evalResponse = await ai.models.generateContent({
+    const cleanedReplyText = finalReplyText.length > 1000 ? finalReplyText.slice(0, 1000) + "... [truncated]" : finalReplyText;
+    const evalResponse = await callWithRetry(() => ai.models.generateContent({
       model: mainModel,
-      contents: `User said:
-"${userQuery}"
-
-Assistant replied:
-"${finalReplyText}"
-
-All existing memories currently stored in the memory bank:
-${memorySummaryText || "None"}
-
-You are Jessie's Long-Term Memory Manager.
-
-Your responsibility is to decide whether this conversation should modify Jessie's long-term memory.
-
-Long-term memory should contain only durable information that is likely to improve future conversations.
-
-Tasks:
-
-1. Determine whether a NEW memory should be created.
-2. Determine whether an EXISTING memory should be deleted.
-3. If neither action is required, leave both as false.
-4. Explain your decision briefly in the "reason" field.
-
-A memory SHOULD be saved only if the user provides durable information such as:
-
-• Long-term preferences
-  Examples:
-  - "Always explain equations step-by-step."
-  - "Use APS citations."
-  - "Answer in simple English."
-  - "From now on..."
-
-• Ongoing research projects
-  Examples:
-  - "I'm working on graphene superconductivity."
-  - "My thesis is about plasma physics."
-
-• Long-term personal working context
-  Examples:
-  - Preferred formatting
-  - Writing style
-  - Citation style
-  - Teaching preference
-  - Permanent workflow instructions
-
-A memory should NOT be saved for:
-
-• Greetings
-• One-time questions
-• Temporary requests
-• Single explanations
-• Short conversations
-• Information already contained in existing memories
-• Facts that are only relevant to the current conversation
-• Assistant-generated content
-• Web search results
-• Temporary research findings
-
-Before saving a memory:
-
-- Compare it against the existing memory list.
-- If an equivalent memory already exists, do NOT create a duplicate.
-- If the new information updates an existing memory, prefer replacing or deleting the old version instead of creating multiple conflicting memories.
-
-Deletion Rules:
-
-Delete a memory ONLY if the user explicitly requests it.
-
-Examples:
-- "Forget my citation preference."
-- "Delete my graphene project."
-- "Remove my explanation preference."
-
-Never delete memories automatically.
-Never infer deletion from context.
-
-If deletion is requested, set deleteMemoryTitle to the EXACT memory title or ID from the memory list above.
-
-If shouldSave is true, generate:
-
-- title
-- description
-- category
-- memory
-- importance (0-10)
-
-Guidelines for generated memory fields:
-
-title:
-A short unique title.
-
-description:
-One concise sentence describing the memory.
-
-category:
-Examples:
-- User Preference
-- Research Project
-- Research Notes
-- Writing Preference
-- Citation Preference
-- Other
-
-memory:
-Store only the durable information itself.
-Do not include unnecessary wording.
-
-importance:
-0–3 = Low future value
-4–6 = Useful
-7–8 = Important
-9–10 = Critical long-term preference or project
-
-Respond ONLY as valid JSON matching the required schema.
-Do not include markdown or any additional explanation.`,
+      contents: `User said: "${userQuery}"\nAssistant replied: "${cleanedReplyText}"\n\nAll existing memories currently stored in the memory bank:\n${memorySummaryText || "None"}\n\nTask:\n1. Did the user state a new durable, reusable preference, fact, or project detail that should be saved? Set shouldSave to true.\n2. Did the user explicitly ask to delete, forget, or remove a previously saved memory/fact? Set shouldDelete to true, and set deleteMemoryTitle to the EXACT title or ID of that memory from the database list above.\n3. Provide the reason for your evaluation in the "reason" field.`,
       config: {
         thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
         responseMimeType: "application/json",
@@ -1428,21 +840,16 @@ Do not include markdown or any additional explanation.`,
           required: ["shouldSave", "shouldDelete", "reason"]
         }
       }
-    });
+    }));
 
     if (evalResponse.text) {
       const parsed = JSON.parse(evalResponse.text.trim());
-      evalResult = {
-        shouldSave: !!parsed.shouldSave,
-        shouldDelete: !!parsed.shouldDelete,
-        deleteMemoryTitle: parsed.deleteMemoryTitle || "",
-        reason: parsed.reason || ""
-      };
+      evalResult = { ...evalResult, ...parsed };
 
       if (evalResult.shouldDelete && evalResult.deleteMemoryTitle) {
         const queryClean = evalResult.deleteMemoryTitle.trim().toLowerCase();
-        const matched = memories.find(m =>
-          m.id.toLowerCase() === queryClean ||
+        const matched = memories.find(m => 
+          m.id.toLowerCase() === queryClean || 
           m.title.toLowerCase() === queryClean ||
           m.title.toLowerCase().includes(queryClean) ||
           queryClean.includes(m.title.toLowerCase())
@@ -1452,19 +859,19 @@ Do not include markdown or any additional explanation.`,
         }
       }
 
-      if (evalResult.shouldSave && parsed.memory) {
-        const memoryVector = await embedText(parsed.memory, "RETRIEVAL_DOCUMENT");
-        const randomIdSuffix = typeof crypto?.randomUUID === 'function'
-          ? crypto.randomUUID().slice(0, 8)
+      if (evalResult.shouldSave && evalResult.memory) {
+        const memoryVector = await embedText(evalResult.memory, "RETRIEVAL_DOCUMENT");
+        const randomIdSuffix = typeof crypto?.randomUUID === 'function' 
+          ? crypto.randomUUID().slice(0, 8) 
           : Math.random().toString(36).substring(2, 10);
 
         newMemoryCreated = {
           id: "mem_" + randomIdSuffix,
-          title: parsed.title || "User Preference Note",
-          description: parsed.description || "Inferred from conversation.",
-          category: parsed.category || "General",
-          memory: parsed.memory,
-          importance: typeof parsed.importance === 'number' ? Math.max(0, Math.min(10, parsed.importance)) : 5,
+          title: evalResult.title || "User Preference Note",
+          description: evalResult.description || "Inferred from conversation.",
+          category: evalResult.category || "General",
+          memory: evalResult.memory,
+          importance: typeof evalResult.importance === 'number' ? Math.max(0, Math.min(10, evalResult.importance)) : 5,
           createdAt: Date.now(),
           embedding: memoryVector
         };
@@ -1483,7 +890,7 @@ Do not include markdown or any additional explanation.`,
     searchUsed,
     searchQueries,
     searchSources,
-    thinkingLevel: mode,
+    thinkingLevel: 'High',
     evalResult: {
       shouldSave: evalResult.shouldSave,
       shouldDelete: evalResult.shouldDelete,
@@ -1518,5 +925,67 @@ Do not include markdown or any additional explanation.`,
     trace,
     newMemoryCreated,
     deletedMemoryId
+  };
+}
+
+/**
+ * Parses raw streamed model text to extract tags like <thought>, <think>, or <|channel>thought.
+ */
+export function parseTextForThoughts(rawText: string): { text: string; thought: string } {
+  let text = rawText;
+  let thought = "";
+
+  // 1. Check for <thought>...</thought> tags
+  const thoughtRegex = /<thought>([\s\S]*?)<\/thought>/gi;
+  if (thoughtRegex.test(text)) {
+    text = text.replace(thoughtRegex, (_, p1) => {
+      thought += (thought ? "\n" : "") + p1;
+      return "";
+    });
+  } else {
+    // If the tag is opened but not closed yet
+    const openThoughtRegex = /<thought>([\s\S]*)$/i;
+    const match = text.match(openThoughtRegex);
+    if (match) {
+      thought = match[1];
+      text = text.replace(openThoughtRegex, "");
+    }
+  }
+
+  // 2. Check for <|channel>thought ... <channel|> tags
+  const channelRegex = /<\|channel>thought([\s\S]*?)<channel\|>/gi;
+  if (channelRegex.test(text)) {
+    text = text.replace(channelRegex, (_, p1) => {
+      thought += (thought ? "\n" : "") + p1;
+      return "";
+    });
+  } else {
+    const openChannelRegex = /<\|channel>thought([\s\S]*)$/i;
+    const match = text.match(openChannelRegex);
+    if (match) {
+      thought = thought || match[1];
+      text = text.replace(openChannelRegex, "");
+    }
+  }
+
+  // 3. Check for standard <think>...</think> tags (like DeepSeek)
+  const thinkRegex = /<think>([\s\S]*?)<\/think>/gi;
+  if (thinkRegex.test(text)) {
+    text = text.replace(thinkRegex, (_, p1) => {
+      thought += (thought ? "\n" : "") + p1;
+      return "";
+    });
+  } else {
+    const openThinkRegex = /<think>([\s\S]*)$/i;
+    const match = text.match(openThinkRegex);
+    if (match) {
+      thought = thought || match[1];
+      text = text.replace(openThinkRegex, "");
+    }
+  }
+
+  return {
+    text: text,
+    thought: thought
   };
 }

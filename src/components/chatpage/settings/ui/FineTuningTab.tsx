@@ -17,13 +17,19 @@ export function FineTuningTab() {
   const [tempInstructions, setTempInstructions] = useState<string>('');
   const [isEditingInstructions, setIsEditingInstructions] = useState<boolean>(false);
 
-  // Sync state changes to localStorage dynamically
+  // Sync state changes to localStorage dynamically with a debounce to prevent lag during dragging
   useEffect(() => {
-    localStorage.setItem('physica_ai_temperature', temperature.toString());
+    const handler = setTimeout(() => {
+      localStorage.setItem('physica_ai_temperature', temperature.toString());
+    }, 150);
+    return () => clearTimeout(handler);
   }, [temperature]);
 
   useEffect(() => {
-    localStorage.setItem('physica_ai_top_p', topP.toString());
+    const handler = setTimeout(() => {
+      localStorage.setItem('physica_ai_top_p', topP.toString());
+    }, 150);
+    return () => clearTimeout(handler);
   }, [topP]);
 
   useEffect(() => {

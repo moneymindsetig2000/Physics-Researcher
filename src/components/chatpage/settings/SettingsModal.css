@@ -1,17 +1,17 @@
 .settings-modal-overlay {
   position: fixed;
   inset: 0;
-  background-color: rgba(2, 2, 4, 0.93); /* Dark, high-opacity background for focus separation */
+  background-color: rgba(2, 2, 4, 0.65); /* Lighter backdrop to match optimized delete overlay and eliminate lag */
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 9999999;
-  animation: settingsFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: settingsFadeIn 0.2s linear forwards;
   will-change: opacity;
 }
 
 .settings-modal-overlay.closing {
-  animation: settingsFadeOut 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: settingsFadeOut 0.18s linear forwards;
 }
 
 /* ─── Settings Modal Container ────────────────────────────────────────────── */

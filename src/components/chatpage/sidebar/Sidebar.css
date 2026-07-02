@@ -65,31 +65,35 @@
 
 /* Navigation Groups */
 .nav-group {
-  flex: 1;
-  overflow-y: auto;
-  margin-bottom: 1rem;
+  flex: 0 0 auto; /* Allow sections to shrink/expand to their natural size and eliminate vertical gaps */
+  margin-bottom: 0.25rem;
   padding-right: 4px; /* Space for scrollbar */
 }
 
 /* Custom Scrollbar for Sidebar nav-group */
-.nav-group::-webkit-scrollbar {
+.nav-group::-webkit-scrollbar,
+.nav-group-container::-webkit-scrollbar {
   width: 6px;
 }
 
-.nav-group::-webkit-scrollbar-track {
+.nav-group::-webkit-scrollbar-track,
+.nav-group-container::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.nav-group::-webkit-scrollbar-thumb {
+.nav-group::-webkit-scrollbar-thumb,
+.nav-group-container::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.08);
   border-radius: 3px;
 }
 
-.nav-group::-webkit-scrollbar-thumb:hover {
+.nav-group::-webkit-scrollbar-thumb:hover,
+.nav-group-container::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.16);
 }
 
-.nav-group {
+.nav-group,
+.nav-group-container {
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.08) transparent;
 }
@@ -414,4 +418,39 @@
 
 .new-chat-btn:hover .new-chat-icon {
   color: #ffffff;
+}
+
+/* ─── Chat Item Options Button ───────────────────────────────────────────── */
+.chat-item-options-btn {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.45);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s ease, color 0.2s ease, background-color 0.2s ease;
+  z-index: 5;
+}
+
+.nav-item:hover .chat-item-options-btn,
+.chat-item-options-btn:focus-visible {
+  opacity: 1;
+}
+
+.chat-item-options-btn:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+/* Ensure the chat name text has padding on the right to avoid overlaying the option dots */
+.nav-link {
+  padding-right: 32px !important;
 }

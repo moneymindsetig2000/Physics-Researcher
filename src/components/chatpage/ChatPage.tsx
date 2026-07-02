@@ -19,56 +19,59 @@ interface Chat {
   id: string;
   name: string;
   messages: Message[];
+  isPinned?: boolean;
 }
 
 export function ChatPage() {
   const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] = useState(false);
   const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed] = useState(false);
-  const [chats, setChats] = useState<Chat[]>([]);
-  const [activeChatId, setActiveChatId] = useState<string | null>(null);
-  const [memories, setMemories] = useState<MemoryRecord[]>([]);
-  // Ref to track whether seed embeddings have been processed — prevents the
-  // embedding useEffect from re-firing when setMemories() updates the array.
-  const embeddingProcessedRef = useRef(false);
-
-  // 1. Initial hydration on mount
-  useEffect(() => {
-    // Load memories
-    const storedMemories = localStorage.getItem('physica_ai_memories');
-    let loadedMemories: MemoryRecord[] = [];
-    if (storedMemories) {
+  const [chats, setChats] = useState<Chat[]>(() => {
+    const stored = localStorage.getItem('physica_ai_chats');
+    if (stored) {
       try {
-        loadedMemories = JSON.parse(storedMemories);
+        return JSON.parse(stored);
       } catch (e) {
-        console.error("Failed to parse stored memories", e);
+        console.error("Failed to parse stored chats", e);
       }
     }
-    if (loadedMemories.length === 0) {
-      loadedMemories = getInitialSeedMemories();
-      localStorage.setItem('physica_ai_memories', JSON.stringify(loadedMemories));
-    }
-    setMemories(loadedMemories);
-
-    // Load chat logs
-    const storedChats = localStorage.getItem('physica_ai_chats');
-    if (storedChats) {
+    return [];
+  });
+  const [activeChatId, setActiveChatId] = useState<string | null>(() => {
+    const stored = localStorage.getItem('physica_ai_chats');
+    if (stored) {
       try {
-        const parsedChats = JSON.parse(storedChats);
-        setChats(parsedChats);
-        if (parsedChats.length > 0) {
-          setActiveChatId(parsedChats[0].id);
+        const parsed = JSON.parse(stored);
+        if (parsed.length > 0) {
+          return parsed[0].id;
         }
       } catch (e) {
         console.error("Failed to parse stored chats", e);
       }
     }
-  }, []);
-
-  // Persist chats on changes
-  useEffect(() => {
-    if (chats.length > 0) {
-      localStorage.setItem('physica_ai_chats', JSON.stringify(chats));
+    return null;
+  });
+  const [memories, setMemories] = useState<MemoryRecord[]>(() => {
+    const stored = localStorage.getItem('physica_ai_memories');
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (parsed.length > 0) return parsed;
+      } catch (e) {
+        console.error("Failed to parse stored memories", e);
+      }
     }
+    const seed = getInitialSeedMemories();
+    localStorage.setItem('physica_ai_memories', JSON.stringify(seed));
+    return seed;
+  });
+  
+  // Ref to track whether seed embeddings have been processed — prevents the
+  // embedding useEffect from re-firing when setMemories() updates the array.
+  const embeddingProcessedRef = useRef(false);
+
+  // Persist chats on changes (runs on empty array as well to clean up localStorage)
+  useEffect(() => {
+    localStorage.setItem('physica_ai_chats', JSON.stringify(chats));
   }, [chats]);
 
   // 2. Auto-Embedding Effect for Seed Memories — runs ONCE after initial load.
@@ -113,7 +116,7 @@ export function ChatPage() {
     setActiveChatId(null);
   }, []);
 
-  const handleSendPrompt = useCallback(async (promptText: string, mode: 'fast' | 'thinking' | 'deep') => {
+  const handleSendPrompt = useCallback(async (promptText: string) => {
     if (!promptText.trim()) return;
 
     // Extract past conversation history before state update
@@ -166,7 +169,6 @@ export function ChatPage() {
       const result = await runQueryPipelineStream(
         promptText,
         memories,
-        mode,
         (chunk) => {
           setChats(prev => prev.map(chat => {
             if (chat.id === currentChatId) {
@@ -253,8 +255,34 @@ export function ChatPage() {
   );
 
   const sidebarChats = useMemo(() => {
-    return chats.map(c => ({ id: c.id, name: c.name }));
-  }, [chats.length, chats[0]?.name]);
+    return chats.map(c => ({ id: c.id, name: c.name, isPinned: c.isPinned }));
+  }, [chats]);
+
+  const handleDeleteChat = useCallback((id: string) => {
+    setChats(prev => {
+      const updated = prev.filter(c => c.id !== id);
+      if (activeChatId === id) {
+        if (updated.length > 0) {
+          setActiveChatId(updated[0].id);
+        } else {
+          setActiveChatId(null);
+        }
+      }
+      return updated;
+    });
+  }, [activeChatId]);
+
+  const handleTogglePinChat = useCallback((id: string) => {
+    setChats(prev => prev.map(chat => {
+      if (chat.id === id) {
+        return {
+          ...chat,
+          isPinned: !chat.isPinned
+        };
+      }
+      return chat;
+    }));
+  }, []);
 
   const handleUpdateMemories = useCallback((updated: MemoryRecord[]) => {
     setMemories(updated);
@@ -279,6 +307,8 @@ export function ChatPage() {
         activeChatId={activeChatId}
         onSelectChat={setActiveChatId}
         onNewChat={handleNewChat}
+        onDeleteChat={handleDeleteChat}
+        onTogglePinChat={handleTogglePinChat}
       />
       <ChatWorkspace 
         isRightSidebarCollapsed={isRightSidebarCollapsed}
