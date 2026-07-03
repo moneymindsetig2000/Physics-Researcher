@@ -13,6 +13,8 @@ interface Message {
   text: string;
   thought?: string;
   trace?: TraceRecord;
+  images?: string[];
+  pdfs?: string[];
 }
 
 interface Chat {
@@ -71,7 +73,20 @@ export function ChatPage() {
 
   // Persist chats on changes (runs on empty array as well to clean up localStorage)
   useEffect(() => {
-    localStorage.setItem('physica_ai_chats', JSON.stringify(chats));
+    try {
+      const sanitizedChats = chats.map(chat => ({
+        ...chat,
+        messages: chat.messages.map(msg => ({
+          ...msg,
+          // Strip large base64 data to keep localStorage clean and prevent QuotaExceededError
+          images: msg.images?.map(() => "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"),
+          pdfs: msg.pdfs?.map(() => "data:application/pdf;base64,PLACEHOLDER")
+        }))
+      }));
+      localStorage.setItem('physica_ai_chats', JSON.stringify(sanitizedChats));
+    } catch (err) {
+      console.warn("Could not persist chats list to localStorage due to quota limits:", err);
+    }
   }, [chats]);
 
   // 2. Auto-Embedding Effect for Seed Memories — runs ONCE after initial load.
@@ -115,9 +130,12 @@ export function ChatPage() {
   const handleNewChat = useCallback(() => {
     setActiveChatId(null);
   }, []);
-
-  const handleSendPrompt = useCallback(async (promptText: string) => {
-    if (!promptText.trim()) return;
+  const handleSendPrompt = useCallback(async (
+    promptText: string, 
+    attachedImages?: string[],
+    attachedPdfs?: string[]
+  ) => {
+    if (!promptText.trim() && (!attachedImages || attachedImages.length === 0) && (!attachedPdfs || attachedPdfs.length === 0)) return;
 
     // Extract past conversation history before state update
     const activeChat = chats.find(c => c.id === activeChatId);
@@ -130,7 +148,9 @@ export function ChatPage() {
     const userMessage: Message = {
       id: 'msg_user_' + Date.now(),
       sender: 'user',
-      text: promptText
+      text: promptText,
+      images: attachedImages,
+      pdfs: attachedPdfs
     };
 
     const aiMsgId = 'msg_ai_' + (Date.now() + 1);
@@ -165,7 +185,18 @@ export function ChatPage() {
     }
 
     try {
-      // Execute the end-to-end reasoning pipeline with streaming, passing conversation history context
+      // Parse data URL arrays to raw objects (mimeType, base64Data) for the Gemini API
+      const parsedImages = attachedImages?.map(url => {
+        const match = url.match(/^data:([^;]+);base64,(.+)$/);
+        return match ? { mimeType: match[1], base64Data: match[2] } : null;
+      }).filter((img): img is { mimeType: string; base64Data: string } => img !== null);
+
+      const parsedPdfs = attachedPdfs?.map(url => {
+        const match = url.match(/^data:([^;]+);base64,(.+)$/);
+        return match ? { mimeType: match[1], base64Data: match[2] } : null;
+      }).filter((pdf): pdf is { mimeType: string; base64Data: string } => pdf !== null);
+
+      // Execute the end-to-end reasoning pipeline with streaming, passing conversation history context and image/document payloads
       const result = await runQueryPipelineStream(
         promptText,
         memories,
@@ -189,7 +220,9 @@ export function ChatPage() {
             return chat;
           }));
         },
-        chatHistory
+        chatHistory,
+        parsedImages,
+        parsedPdfs
       );
 
       // Once streaming fully completes, attach final trace data and sync states
@@ -289,6 +322,12 @@ export function ChatPage() {
     localStorage.setItem('physica_ai_memories', JSON.stringify(updated));
   }, []);
 
+  const handleClearAllChats = useCallback(() => {
+    setChats([]);
+    setActiveChatId(null);
+    localStorage.setItem('physica_ai_chats', JSON.stringify([]));
+  }, []);
+
   const handleToggleRightSidebar = useCallback(() => {
     setIsRightSidebarCollapsed(prev => !prev);
   }, []);
@@ -309,6 +348,9 @@ export function ChatPage() {
         onNewChat={handleNewChat}
         onDeleteChat={handleDeleteChat}
         onTogglePinChat={handleTogglePinChat}
+        memories={memories}
+        onUpdateMemories={handleUpdateMemories}
+        onClearAllChats={handleClearAllChats}
       />
       <ChatWorkspace 
         isRightSidebarCollapsed={isRightSidebarCollapsed}

@@ -4,7 +4,7 @@
  */
 
 export const AI_CONFIG = {
-  model: 'gemma-4-31b-it',
+  model: 'gemma-4-26b-a4b-it',
   version: '1.0.0',
 };
 

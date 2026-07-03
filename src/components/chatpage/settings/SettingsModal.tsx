@@ -5,17 +5,29 @@ import { FineTuningTab } from './ui/FineTuningTab';
 import { PromptProTab } from './ui/PromptProTab';
 import { ProfileTab } from './ui/ProfileTab';
 import { DocsTab } from './ui/DocsTab';
+import { DataTab } from './ui/DataTab';
+import type { MemoryRecord } from '../../../utils/ai/types';
 import './SettingsModal.css';
 
 interface SettingsModalProps {
   isOpen: boolean;
   isClosing: boolean;
   onClose: () => void;
+  memories: MemoryRecord[];
+  onUpdateMemories: (updated: MemoryRecord[]) => void;
+  onClearAllChats: () => void;
 }
 
-type TabType = 'dashboard' | 'fine-tuning' | 'promptpro' | 'profile' | 'docs';
+type TabType = 'dashboard' | 'fine-tuning' | 'promptpro' | 'profile' | 'docs' | 'data';
 
-export function SettingsModal({ isOpen, isClosing, onClose }: SettingsModalProps) {
+export function SettingsModal({ 
+  isOpen, 
+  isClosing, 
+  onClose,
+  memories,
+  onUpdateMemories,
+  onClearAllChats
+}: SettingsModalProps) {
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
 
   if (!isOpen) return null;
@@ -32,6 +44,14 @@ export function SettingsModal({ isOpen, isClosing, onClose }: SettingsModalProps
         return <ProfileTab />;
       case 'docs':
         return <DocsTab />;
+      case 'data':
+        return (
+          <DataTab 
+            memories={memories}
+            onUpdateMemories={onUpdateMemories}
+            onClearAllChats={onClearAllChats}
+          />
+        );
       default:
         return null;
     }
@@ -101,6 +121,16 @@ export function SettingsModal({ isOpen, isClosing, onClose }: SettingsModalProps
                     <circle cx="12" cy="7" r="4" />
                   </svg>
                   <span>My Profile</span>
+                </button>
+              </li>
+              <li className={activeTab === 'data' ? 'active' : ''}>
+                <button onClick={() => setActiveTab('data')}>
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
+                    <ellipse cx="12" cy="5" rx="9" ry="3" />
+                    <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
+                    <path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3" />
+                  </svg>
+                  <span>Memory & Chats</span>
                 </button>
               </li>
               <li className={activeTab === 'docs' ? 'active' : ''}>

@@ -82,21 +82,21 @@ export function FineTuningTab() {
 
   return (
     <div className="tab-pane-content fade-in" id="fine-tuning-tab-pane">
-      <div className="dashboard-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-        <div>
-          <h2 className="tab-title">Fine-tuning Settings</h2>
-          <p className="tab-description" style={{ margin: 0 }}>Experiment with parameters and model inference constraints in real-time.</p>
+      <div className="dashboard-header-row" style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '2rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <h2 className="tab-title" style={{ margin: 0 }}>Fine-tuning Settings</h2>
+          <button 
+            className="settings-action-btn secondary-action" 
+            onClick={handleResetToDefaults}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+          >
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ display: 'block' }}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
+            </svg>
+            <span>Reset to Defaults</span>
+          </button>
         </div>
-        <button 
-          className="settings-action-btn secondary-action" 
-          onClick={handleResetToDefaults}
-          style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-        >
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ display: 'block' }}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
-          </svg>
-          <span>Reset to Defaults</span>
-        </button>
+        <p className="tab-description" style={{ margin: 0 }}>Experiment with parameters and model inference constraints in real-time.</p>
       </div>
 
       <div className="lab-options">

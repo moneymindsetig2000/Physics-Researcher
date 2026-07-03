@@ -1,0 +1,291 @@
+.data-section {
+  display: flex;
+  flex-direction: column;
+  margin-top: 1rem;
+}
+
+.data-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.data-section-header h3 {
+  font-family: var(--font-sans);
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #ffffff;
+  margin: 0;
+}
+
+/* Memories Grid & Cards */
+.data-memory-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 1rem;
+  margin-top: 0.25rem;
+  
+  /* Kill rendering lag: isolates calculations & DOM paint of individual cards */
+  contain: content;
+}
+
+.data-memory-card {
+  position: relative;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.08), 0 4px 12px rgba(0, 0, 0, 0.2);
+  
+  /* Clickable pointer */
+  cursor: pointer;
+  
+  /* Performance optimization: transition ONLY specific properties (no 'all') to prevent full layouts on hover */
+  transition: 
+    background-color 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-sizing: border-box;
+}
+
+.data-memory-card:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.12);
+  transform: translateY(-2px);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.12), 0 8px 16px rgba(0, 0, 0, 0.3);
+}
+
+.card-top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.data-card-category {
+  font-family: var(--font-sans);
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #10b981;
+  letter-spacing: 0.03em;
+}
+
+.data-card-date {
+  font-family: var(--font-sans);
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.data-card-text {
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.75);
+  line-height: 1.4;
+  margin: 0;
+  word-break: break-word;
+}
+
+/* Chat Control Card */
+.data-chat-control-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 1.25rem;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.1), 0 4px 12px rgba(0, 0, 0, 0.2);
+  box-sizing: border-box;
+  gap: 1.5rem;
+}
+
+.control-card-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.control-card-info h4 {
+  font-family: var(--font-sans);
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #ffffff;
+  margin: 0;
+}
+
+.control-card-info p {
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.4);
+  margin: 4px 0 0 0;
+  line-height: 1.35;
+}
+
+/* Empty State */
+.data-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2.5rem 1.5rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.01);
+  border: 1px dashed rgba(255, 255, 255, 0.08);
+  text-align: center;
+}
+
+.empty-state-icon-svg {
+  color: rgba(255, 255, 255, 0.2);
+  margin-bottom: 0.75rem;
+}
+
+.data-empty-text {
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.35);
+  margin: 0;
+}
+
+/* High-Performance confirmation modals (almost 0 backdrop opacity & zero blur) */
+.data-modal-wrapper {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100000000;
+}
+
+.data-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background-color: rgba(2, 2, 4, 0.12); /* Extremely light translucent overlay */
+  z-index: 1;
+  /* NO backdrop-filter: blur(...) to avoid rendering lag and GPU layouts */
+  animation: dataFadeIn 0.12s linear forwards;
+}
+
+.data-modal-container {
+  position: relative;
+  z-index: 2;
+  width: 440px;
+  max-width: 90vw;
+  background-color: #060608;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: 14px;
+  box-shadow: 
+    0 20px 40px rgba(0, 0, 0, 0.65),
+    0 0 20px rgba(239, 68, 68, 0.04),
+    inset 0 1px 1px rgba(255, 255, 255, 0.08);
+  padding: 1.5rem;
+  box-sizing: border-box;
+  animation: dataZoomIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+
+.data-modal-wrapper.closing .data-modal-backdrop {
+  animation: dataFadeOut 0.12s linear forwards;
+}
+
+.data-modal-wrapper.closing .data-modal-container {
+  animation: dataZoomOut 0.15s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.data-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.data-warning-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background-color: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ef4444;
+}
+
+.data-modal-header h3 {
+  font-family: var(--font-sans);
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #ffffff;
+  margin: 0;
+}
+
+.data-modal-body {
+  font-family: var(--font-sans);
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.75);
+  margin-bottom: 1.5rem;
+}
+
+.data-modal-body p {
+  margin: 0 0 0.5rem 0;
+}
+
+.data-modal-body p:last-child {
+  margin-bottom: 0;
+}
+
+.data-modal-warning-text {
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.38);
+}
+
+.data-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+/* Specific Memory edit/delete popup styles overrides */
+.memory-modal-overlay {
+  z-index: 100000001 !important; /* Forces layout rendering above Settings Modal (which has z-index: 9999999) */
+  background-color: rgba(2, 2, 4, 0.45) !important; /* Low opacity backdrop overlay to resolve lag */
+  backdrop-filter: none !important; /* Explicitly disable blur filter to preserve GPU performance */
+  -webkit-backdrop-filter: none !important;
+}
+
+@keyframes dataFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes dataFadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes dataZoomIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes dataZoomOut {
+  from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.97) translateY(3px);
+  }
+}

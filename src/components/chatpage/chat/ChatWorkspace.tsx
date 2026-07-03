@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { WorkspaceHeader } from './ui/WorkspaceHeader';
 import { WelcomeState } from './ui/WelcomeState';
 import { ComposerInput } from './ui/ComposerInput';
@@ -14,6 +15,8 @@ interface Message {
   text: string;
   thought?: string;
   trace?: TraceRecord;
+  images?: string[];
+  pdfs?: string[];
 }
 
 interface Chat {
@@ -28,15 +31,65 @@ interface ChatWorkspaceProps {
   isLeftSidebarCollapsed: boolean;
   onToggleLeftSidebar: () => void;
   activeChat: Chat | null;
-  onSendPrompt: (promptText: string) => void;
+  onSendPrompt: (promptText: string, attachedImages?: string[], attachedPdfs?: string[]) => void;
 }
 
-const MessageItem = React.memo(({ msg }: { msg: Message }) => {
+const MessageItem = React.memo(({ 
+  msg,
+  onImageClick
+}: { 
+  msg: Message;
+  onImageClick?: (url: string) => void;
+}) => {
+  const handleDownloadPdf = (pdfDataUrl: string) => {
+    try {
+      const link = document.createElement('a');
+      link.href = pdfDataUrl;
+      link.download = 'document.pdf';
+      link.click();
+    } catch (err) {
+      console.error("Failed to download PDF:", err);
+    }
+  };
+
   return (
     <div className={`message-row ${msg.sender === 'user' ? 'user-row' : 'ai-row'}`}>
       {msg.sender === 'user' ? (
-        <div className="user-message-box">
-          <MarkdownRenderer content={msg.text} />
+        <div className="user-message-wrapper">
+          {msg.images && msg.images.length > 0 && (
+            <div className="user-message-images-row">
+              {msg.images.map((img, idx) => (
+                <img 
+                  key={idx} 
+                  src={img} 
+                  alt="user attachment" 
+                  onClick={() => onImageClick?.(img)}
+                  style={{ cursor: 'pointer' }}
+                />
+              ))}
+            </div>
+          )}
+          {msg.pdfs && msg.pdfs.length > 0 && (
+            <div className="user-message-files-row">
+              {msg.pdfs.map((pdf, idx) => (
+                <div 
+                  key={idx} 
+                  className="message-file-card" 
+                  onClick={() => handleDownloadPdf(pdf)}
+                  title="Click to download PDF"
+                >
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="message-file-card-icon">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                  </svg>
+                  <span className="message-file-card-name">PDF Document {msg.pdfs!.length > 1 ? `#${idx + 1}` : ''}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="user-message-box">
+            <MarkdownRenderer content={msg.text} />
+          </div>
         </div>
       ) : (
         <div className="ai-message-ground">
@@ -60,7 +113,15 @@ const MessageItem = React.memo(({ msg }: { msg: Message }) => {
     prevProps.msg.id === nextProps.msg.id &&
     prevProps.msg.text === nextProps.msg.text &&
     prevProps.msg.thought === nextProps.msg.thought &&
-    prevProps.msg.trace === nextProps.msg.trace
+    prevProps.msg.trace === nextProps.msg.trace &&
+    (prevProps.msg.images === nextProps.msg.images || 
+      (Array.isArray(prevProps.msg.images) && Array.isArray(nextProps.msg.images) && 
+       prevProps.msg.images.length === nextProps.msg.images.length &&
+       prevProps.msg.images.every((img, idx) => img === nextProps.msg.images![idx]))) &&
+    (prevProps.msg.pdfs === nextProps.msg.pdfs || 
+      (Array.isArray(prevProps.msg.pdfs) && Array.isArray(nextProps.msg.pdfs) && 
+       prevProps.msg.pdfs.length === nextProps.msg.pdfs.length &&
+       prevProps.msg.pdfs.every((pdf, idx) => pdf === nextProps.msg.pdfs![idx])))
   );
 });
 
@@ -73,10 +134,14 @@ export function ChatWorkspace({
   onSendPrompt
 }: ChatWorkspaceProps) {
   const [message, setMessage] = useState('');
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
-  const handleSend = () => {
-    if (!message.trim()) return;
-    onSendPrompt(message);
+  const handleSend = (
+    attachedImages: string[], 
+    attachedPdfs: string[]
+  ) => {
+    if (!message.trim() && attachedImages.length === 0 && attachedPdfs.length === 0) return;
+    onSendPrompt(message, attachedImages, attachedPdfs);
     setMessage('');
   };
 
@@ -98,11 +163,15 @@ export function ChatWorkspace({
         {activeChat && activeChat.messages.length > 0 ? (
           <div className="conversation-flow" id="conversation-flow-list">
             {activeChat.messages.map((msg) => (
-              <MessageItem key={msg.id} msg={msg} />
+              <MessageItem 
+                key={msg.id} 
+                msg={msg} 
+                onImageClick={setPreviewImage}
+              />
             ))}
           </div>
         ) : (
-          <WelcomeState onSelectPrompt={onSendPrompt} />
+          <WelcomeState onSelectPrompt={(text) => onSendPrompt(text, [])} />
         )}
 
         {/* Bottom Blur Overlay */}
@@ -115,12 +184,33 @@ export function ChatWorkspace({
             message={message} 
             onChange={setMessage} 
             onSend={handleSend} 
+            onImageClick={setPreviewImage}
           />
         </div>
       </main>
 
       {/* Workspace Footer */}
       <WorkspaceFooter />
+
+      {/* Fullscreen Image Preview Modal (mounted using react Portal directly to document.body) */}
+      {previewImage && createPortal(
+        <div className="image-fullscreen-overlay" onClick={() => setPreviewImage(null)}>
+          <div className="image-fullscreen-container" onClick={(e) => e.stopPropagation()}>
+            <button 
+              className="image-fullscreen-close-btn" 
+              onClick={() => setPreviewImage(null)}
+              aria-label="Close preview"
+            >
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+            <img src={previewImage} alt="Fullscreen Preview" className="image-fullscreen-content" />
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }

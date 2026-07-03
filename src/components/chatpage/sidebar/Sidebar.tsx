@@ -5,6 +5,7 @@ import { SidebarNavItem } from './ui/SidebarNavItem';
 import { UserProfileBar } from './ui/UserProfileBar';
 import { SettingsModal } from '../settings/SettingsModal';
 import { DeleteConfirmationModal } from './options/DeleteConfirmationModal';
+import type { MemoryRecord } from '../../../utils/ai/types';
 import './Sidebar.css';
 
 interface Chat {
@@ -22,6 +23,9 @@ interface SidebarProps {
   onNewChat: () => void;
   onDeleteChat: (id: string) => void;
   onTogglePinChat: (id: string) => void;
+  memories: MemoryRecord[];
+  onUpdateMemories: (updated: MemoryRecord[]) => void;
+  onClearAllChats: () => void;
 }
 
 export const Sidebar = React.memo(function Sidebar({ 
@@ -32,7 +36,10 @@ export const Sidebar = React.memo(function Sidebar({
   onSelectChat,
   onNewChat,
   onDeleteChat,
-  onTogglePinChat
+  onTogglePinChat,
+  memories,
+  onUpdateMemories,
+  onClearAllChats
 }: SidebarProps) {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSettingsClosing, setIsSettingsClosing] = useState(false);
@@ -176,6 +183,9 @@ export const Sidebar = React.memo(function Sidebar({
         isOpen={isSettingsOpen} 
         isClosing={isSettingsClosing} 
         onClose={handleCloseSettings} 
+        memories={memories}
+        onUpdateMemories={onUpdateMemories}
+        onClearAllChats={onClearAllChats}
       />
 
       {/* Delete Confirmation Modal Portal Overlay */}
@@ -198,6 +208,11 @@ export const Sidebar = React.memo(function Sidebar({
     prevProps.activeChatId === nextProps.activeChatId &&
     prevProps.onDeleteChat === nextProps.onDeleteChat &&
     prevProps.onTogglePinChat === nextProps.onTogglePinChat &&
+    prevProps.onUpdateMemories === nextProps.onUpdateMemories &&
+    prevProps.onClearAllChats === nextProps.onClearAllChats &&
+    // Shallow compare memories array
+    prevProps.memories.length === nextProps.memories.length &&
+    prevProps.memories.every((m, i) => m.id === nextProps.memories[i].id && m.memory === nextProps.memories[i].memory) &&
     // Shallow compare array elements
     prevProps.chats.length === nextProps.chats.length &&
     prevProps.chats.every((c, i) => c.id === nextProps.chats[i].id && c.name === nextProps.chats[i].name && c.isPinned === nextProps.chats[i].isPinned)
