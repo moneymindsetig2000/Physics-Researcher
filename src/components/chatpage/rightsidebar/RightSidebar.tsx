@@ -6,18 +6,25 @@ import type { MemoryRecord } from '../../../utils/ai/types';
 import { embedText } from '../../../utils/ai/gemini';
 import './RightSidebar.css';
 
+interface ChatFileMessage {
+  images?: string[];
+  pdfs?: string[];
+}
+
 interface RightSidebarProps {
   isCollapsed: boolean;
   onToggleCollapse: () => void;
   memories: MemoryRecord[];
   onUpdateMemories: (updated: MemoryRecord[]) => void;
+  chatMessages: ChatFileMessage[];
 }
 
 export function RightSidebar({ 
   isCollapsed, 
   onToggleCollapse, 
   memories, 
-  onUpdateMemories 
+  onUpdateMemories,
+  chatMessages
 }: RightSidebarProps) {
   const [activeTab, setActiveTab] = useState<'tools' | 'files'>('tools');
   const [selectedMemoryIndex, setSelectedMemoryIndex] = useState<number | null>(null);
@@ -28,6 +35,21 @@ export function RightSidebar({
   const [isAddingMemory, setIsAddingMemory] = useState(false);
   const [newMemoryText, setNewMemoryText] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+
+  const allImages = (chatMessages || []).flatMap(msg => msg.images || []);
+  const allPdfs = (chatMessages || []).flatMap(msg => msg.pdfs || []);
+
+  const handleDownloadPdf = (pdfDataUrl: string) => {
+    try {
+      const link = document.createElement('a');
+      link.href = pdfDataUrl;
+      link.download = 'document.pdf';
+      link.click();
+    } catch (err) {
+      console.error("Failed to download PDF:", err);
+    }
+  };
 
   const handleAddMemory = (e: React.MouseEvent<HTMLButtonElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -177,7 +199,40 @@ export function RightSidebar({
           </div>
 
           <div className="slide-pane files-tab-content">
-            <p className="files-empty-text">No uploaded files yet. Attach files in the composer to view them here.</p>
+            {allImages.length === 0 && allPdfs.length === 0 ? (
+              <p className="files-empty-text">No uploaded files yet. Attach files in the composer to view them here.</p>
+            ) : (
+              <div className="files-list">
+                {allImages.length > 0 && (
+                  <>
+                    <span className="files-section-label">Images</span>
+                    <div className="files-images-grid">
+                      {allImages.map((img, idx) => (
+                        <div key={`img_${idx}`} className="files-image-item" onClick={() => setPreviewImage(img)}>
+                          <img src={img} alt={`Uploaded image ${idx + 1}`} />
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+                {allPdfs.length > 0 && (
+                  <>
+                    <span className="files-section-label" style={allImages.length > 0 ? { marginTop: '1rem' } : {}}>Documents</span>
+                    <div className="files-pdfs-list">
+                      {allPdfs.map((pdf, idx) => (
+                        <div key={`pdf_${idx}`} className="files-pdf-item" onClick={() => handleDownloadPdf(pdf)} title="Click to download PDF">
+                          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                          </svg>
+                          <span>PDF Document {allPdfs.length > 1 ? `#${idx + 1}` : ''}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -243,6 +298,25 @@ export function RightSidebar({
                 </>
               )}
             </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {previewImage && createPortal(
+        <div className="image-fullscreen-overlay" onClick={() => setPreviewImage(null)}>
+          <div className="image-fullscreen-container" onClick={(e) => e.stopPropagation()}>
+            <button 
+              className="image-fullscreen-close-btn" 
+              onClick={() => setPreviewImage(null)}
+              aria-label="Close preview"
+            >
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+            <img src={previewImage} alt="Fullscreen Preview" className="image-fullscreen-content" />
           </div>
         </div>,
         document.body

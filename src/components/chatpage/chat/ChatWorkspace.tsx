@@ -32,6 +32,8 @@ interface ChatWorkspaceProps {
   onToggleLeftSidebar: () => void;
   activeChat: Chat | null;
   onSendPrompt: (promptText: string, attachedImages?: string[], attachedPdfs?: string[]) => void;
+  isGenerating?: boolean;
+  onStopGeneration?: () => void;
 }
 
 const MessageItem = React.memo(({ 
@@ -46,9 +48,11 @@ const MessageItem = React.memo(({
       const link = document.createElement('a');
       link.href = pdfDataUrl;
       link.download = 'document.pdf';
+      document.body.appendChild(link);
       link.click();
-    } catch (err) {
-      console.error("Failed to download PDF:", err);
+      document.body.removeChild(link);
+    } catch (e) {
+      console.error("PDF download failed", e);
     }
   };
 
@@ -131,7 +135,9 @@ export function ChatWorkspace({
   isLeftSidebarCollapsed,
   onToggleLeftSidebar,
   activeChat,
-  onSendPrompt
+  onSendPrompt,
+  isGenerating,
+  onStopGeneration
 }: ChatWorkspaceProps) {
   const [message, setMessage] = useState('');
   const [previewImage, setPreviewImage] = useState<string | null>(null);
@@ -185,6 +191,8 @@ export function ChatWorkspace({
             onChange={setMessage} 
             onSend={handleSend} 
             onImageClick={setPreviewImage}
+            isGenerating={isGenerating}
+            onStopGeneration={onStopGeneration}
           />
         </div>
       </main>

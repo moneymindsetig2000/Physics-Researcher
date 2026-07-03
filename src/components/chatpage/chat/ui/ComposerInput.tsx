@@ -5,6 +5,8 @@ interface ComposerInputProps {
   onChange: (message: string) => void;
   onSend: (attachedImages: string[], attachedPdfs: string[]) => void;
   onImageClick?: (url: string) => void;
+  isGenerating?: boolean;
+  onStopGeneration?: () => void;
 }
 
 // High-Performance image compression via canvas and object URLs to avoid huge string allocations
@@ -58,7 +60,9 @@ export function ComposerInput({
   message, 
   onChange, 
   onSend,
-  onImageClick
+  onImageClick,
+  isGenerating,
+  onStopGeneration
 }: ComposerInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -337,17 +341,25 @@ export function ComposerInput({
         </div>
 
         <button 
-          className="composer-send-btn" 
+          className={`composer-send-btn ${isGenerating ? 'stop-active' : ''}`} 
           id="btn-send-message" 
-          aria-label="Send Message"
+          aria-label={isGenerating ? "Stop Message" : "Send Message"}
           type="button"
-          onClick={handleSendPrompt}
+          onClick={isGenerating ? onStopGeneration : handleSendPrompt}
         >
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="send-icon-svg">
-            <line x1="12" y1="19" x2="12" y2="5" />
-            <polyline points="5 12 12 5 19 12" />
-          </svg>
-          <span className="tooltip tooltip-above tooltip-right-align">Send query to the physics intelligence companion.</span>
+          {isGenerating ? (
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="stop-icon">
+              <rect x="5" y="5" width="14" height="14" rx="2" />
+            </svg>
+          ) : (
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="send-icon-svg">
+              <line x1="12" y1="19" x2="12" y2="5" />
+              <polyline points="5 12 12 5 19 12" />
+            </svg>
+          )}
+          <span className="tooltip tooltip-above tooltip-right-align">
+            {isGenerating ? "Stop generating query response" : "Send query to the physics intelligence companion."}
+          </span>
         </button>
       </div>
     </div>

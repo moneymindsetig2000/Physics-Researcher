@@ -35,16 +35,38 @@ export function isApiKeyConfigured(): boolean {
 /**
  * Executes an asynchronous Gemini API task with exponential backoff retry on 500 and 503 errors.
  */
-async function callWithRetry<T>(fn: () => Promise<T>, retries = 4, delay = 1500): Promise<T> {
+async function callWithRetry<T>(fn: () => Promise<T>, retries = 4, delay = 1500, signal?: AbortSignal): Promise<T> {
+  if (signal?.aborted) {
+    throw new DOMException("The user aborted a request.", "AbortError");
+  }
   try {
     return await fn();
   } catch (error: any) {
+    if (signal?.aborted || error.name === 'AbortError') {
+      throw new DOMException("The user aborted a request.", "AbortError");
+    }
     const errorStr = String(error);
     const isRetryable = errorStr.includes("500") || errorStr.includes("503") || errorStr.includes("demand") || errorStr.includes("INTERNAL") || errorStr.includes("UNAVAILABLE") || errorStr.includes("RESOURCE_EXHAUSTED") || errorStr.includes("429");
     if (retries > 0 && isRetryable) {
       console.warn(`Temporary API error encountered. Retrying in ${delay}ms... (${retries} retries left). Error:`, error);
-      await new Promise(resolve => setTimeout(resolve, delay));
-      return callWithRetry(fn, retries - 1, delay * 2);
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          if (signal) {
+            signal.removeEventListener("abort", onAbort);
+          }
+          resolve();
+        }, delay);
+        
+        function onAbort() {
+          clearTimeout(timeout);
+          reject(new DOMException("The user aborted a request.", "AbortError"));
+        }
+        
+        if (signal) {
+          signal.addEventListener("abort", onAbort);
+        }
+      });
+      return callWithRetry(fn, retries - 1, delay * 2, signal);
     }
     throw error;
   }
@@ -439,7 +461,8 @@ export async function runQueryPipelineStream(
   onChunk: (data: { text: string; thought: string }) => void,
   chatHistory: { sender: 'user' | 'ai'; text: string }[] = [],
   images?: { mimeType: string; base64Data: string }[],
-  pdfs?: { mimeType: string; base64Data: string }[]
+  pdfs?: { mimeType: string; base64Data: string }[],
+  signal?: AbortSignal
 ): Promise<PipelineResult> {
   const ai = getAIClient();
 
@@ -447,6 +470,9 @@ export async function runQueryPipelineStream(
   let memoryRequired = false;
   let decisionReason = "";
 
+  if (signal?.aborted) {
+    throw new DOMException("The user aborted a request.", "AbortError");
+  }
   try {
     const decisionResponse = await callWithRetry(() => ai.models.generateContent({
       model: "gemma-4-26b-a4b-it",
@@ -488,7 +514,7 @@ DO NOT include any <think> or <thought> tags. Output raw JSON only.`,
           required: ["memoryRequired", "reason"]
         }
       }
-    }));
+    }, { signal }), 4, 1500, signal);
 
     if (decisionResponse.text) {
       const parsed = JSON.parse(decisionResponse.text.trim());
@@ -523,6 +549,9 @@ DO NOT include any <think> or <thought> tags. Output raw JSON only.`,
       const mem = item.memory;
       const finalRankScore = item.finalRankScore;
       try {
+        if (signal?.aborted) {
+          throw new DOMException("The user aborted a request.", "AbortError");
+        }
         const prompt = `User Query:
 "${userQuery}"
 
@@ -566,7 +595,7 @@ User preferences are always considered relevant whenever they affect response fo
               required: ["relevant", "confidence", "reason"]
             }
           }
-        }), 6, 2000);
+        }, { signal }), 6, 2000, signal);
 
         if (res.text) {
           const parsed = JSON.parse(res.text.trim());
@@ -761,6 +790,10 @@ User preferences are always considered relevant whenever they affect response fo
       replyText = "";
       accumulatedThought = "";
 
+      if (signal?.aborted) {
+        throw new DOMException("The user aborted a request.", "AbortError");
+      }
+
       const responseStream = await callWithRetry(() => ai.models.generateContentStream({
         model: mainModel,
         contents: apiContents,
@@ -773,9 +806,12 @@ User preferences are always considered relevant whenever they affect response fo
           temperature,
           topP
         }
-      }));
+      }, { signal }), 3, 1500, signal);
 
       for await (const chunk of responseStream) {
+        if (signal?.aborted) {
+          throw new DOMException("The user aborted a request.", "AbortError");
+        }
         const groundingMetadata = chunk.candidates?.[0]?.groundingMetadata;
         if (groundingMetadata) {
           searchUsed = searchUsed || !!(groundingMetadata.webSearchQueries && groundingMetadata.webSearchQueries.length > 0);
@@ -882,6 +918,9 @@ User preferences are always considered relevant whenever they affect response fo
   let deletedMemoryId: string | undefined = undefined;
 
   try {
+    if (signal?.aborted) {
+      throw new DOMException("The user aborted a request.", "AbortError");
+    }
     const memorySummaryText = memories.map(m => `- ID: "${m.id}", Title: "${m.title}", Memory content: "${m.memory}"`).join("\n");
     const cleanedReplyText = finalReplyText.length > 1000 ? finalReplyText.slice(0, 1000) + "... [truncated]" : finalReplyText;
     const evalResponse = await callWithRetry(() => ai.models.generateContent({
@@ -915,7 +954,7 @@ User preferences are always considered relevant whenever they affect response fo
           ]
         }
       }
-    }));
+    }, { signal }), 4, 1500, signal);
 
     if (evalResponse.text) {
       const parsed = JSON.parse(evalResponse.text.trim());

@@ -71,6 +71,25 @@ export function ChatPage() {
   // embedding useEffect from re-firing when setMemories() updates the array.
   const embeddingProcessedRef = useRef(false);
 
+  const [isGenerating, setIsGenerating] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  const handleStopGeneration = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsGenerating(false);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
+
   // Persist chats on changes (runs on empty array as well to clean up localStorage)
   useEffect(() => {
     try {
@@ -78,9 +97,8 @@ export function ChatPage() {
         ...chat,
         messages: chat.messages.map(msg => ({
           ...msg,
-          // Strip large base64 data to keep localStorage clean and prevent QuotaExceededError
-          images: msg.images?.map(() => "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"),
-          pdfs: msg.pdfs?.map(() => "data:application/pdf;base64,PLACEHOLDER")
+          images: msg.images,
+          pdfs: msg.pdfs
         }))
       }));
       localStorage.setItem('physica_ai_chats', JSON.stringify(sanitizedChats));
@@ -184,6 +202,10 @@ export function ChatPage() {
       }));
     }
 
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    setIsGenerating(true);
+
     try {
       // Parse data URL arrays to raw objects (mimeType, base64Data) for the Gemini API
       const parsedImages = attachedImages?.map(url => {
@@ -222,7 +244,8 @@ export function ChatPage() {
         },
         chatHistory,
         parsedImages,
-        parsedPdfs
+        parsedPdfs,
+        controller.signal
       );
 
       // Once streaming fully completes, attach final trace data and sync states
@@ -258,7 +281,33 @@ export function ChatPage() {
         setMemories(activeMemories);
         localStorage.setItem('physica_ai_memories', JSON.stringify(activeMemories));
       }
-    } catch (err) {
+    } catch (err: any) {
+      if (err.name === 'AbortError' || err.message?.includes('aborted') || err.message?.includes('AbortError')) {
+        console.log("Generation aborted by user.");
+        setChats(prev => prev.map(chat => {
+          if (chat.id === currentChatId) {
+            return {
+              ...chat,
+              messages: chat.messages.map(msg => {
+                if (msg.id === aiMsgId) {
+                  const baseText = msg.text ? msg.text.trim() : "";
+                  const stopText = baseText 
+                    ? `${baseText}\n\n*Generation stopped by user.*` 
+                    : "*Generation stopped by user.*";
+                  return {
+                    ...msg,
+                    text: stopText,
+                    thought: msg.thought
+                  };
+                }
+                return msg;
+              })
+            };
+          }
+          return chat;
+        }));
+        return;
+      }
       console.error("Pipeline query execution failed:", err);
       const errMsg = err instanceof Error ? err.message : String(err);
       setChats(prev => prev.map(chat => {
@@ -279,6 +328,11 @@ export function ChatPage() {
         }
         return chat;
       }));
+    } finally {
+      setIsGenerating(false);
+      if (abortControllerRef.current === controller) {
+        abortControllerRef.current = null;
+      }
     }
   }, [activeChatId, chats, memories]);
 
@@ -359,12 +413,15 @@ export function ChatPage() {
         onToggleLeftSidebar={handleToggleLeftSidebar}
         activeChat={activeChat}
         onSendPrompt={handleSendPrompt}
+        isGenerating={isGenerating}
+        onStopGeneration={handleStopGeneration}
       />
       <RightSidebar 
         isCollapsed={isRightSidebarCollapsed} 
         onToggleCollapse={handleToggleRightSidebar} 
         memories={memories}
         onUpdateMemories={handleUpdateMemories}
+        chatMessages={activeChat?.messages || []}
       />
     </div>
   );

@@ -243,21 +243,21 @@ export function DashboardTab({ isOpen }: DashboardTabProps) {
 
   return (
     <div className="tab-pane-content fade-in" id="dashboard-tab-pane">
-      <div className="dashboard-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-        <div>
+      <div className="dashboard-header-row" style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '2rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <h2 className="tab-title">Research Dashboard</h2>
-          <p className="tab-description" style={{ margin: 0 }}>System telemetry and workspace academic integration analytics.</p>
+          <button 
+            className="settings-action-btn secondary-action" 
+            onClick={handleRefresh}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+          >
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" className="refresh-icon" style={{ display: 'block' }}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+            </svg>
+            <span>Refresh</span>
+          </button>
         </div>
-        <button 
-          className="settings-action-btn secondary-action" 
-          onClick={handleRefresh}
-          style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-        >
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" className="refresh-icon" style={{ display: 'block' }}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
-          </svg>
-          <span>Refresh</span>
-        </button>
+        <p className="tab-description" style={{ margin: 0 }}>System telemetry and workspace academic integration analytics.</p>
       </div>
       
       <div className="settings-grid">
