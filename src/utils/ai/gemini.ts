@@ -6,7 +6,8 @@ import {
   RELEVANCE_THRESHOLD
 } from "./config";
 import type { MemoryRecord, TraceRecord } from "./types";
-import { rankMemories, formatSystemInstruction } from "../pipeline/pipeline";
+import { rankMemories } from "../pipeline/pipeline";
+import { DEFAULT_SYSTEM_ROLE } from "../systemroles/systemroles";
 
 /**
  * Initialize and return the GoogleGenAI client lazily.
@@ -290,13 +291,6 @@ export async function runQueryPipelineStream(
     }
   }
 
-  const MEMORY_BASE_INSTRUCTION = `You are a helpful physics research assistant with access to a memory bank of past conversations, preferences, and research notes.
-
-AT THE END OF YOUR RESPONSE:
-- If the user shared a new preference, fact, or project detail worth saving: <memory_action><save><title>Short Title</title><description>Brief description</description><category>Category</category><memory>The full memory content to save</memory><importance>5</importance></save></memory_action>
-- If the user asked to delete/forget a memory: <memory_action><delete><title>Exact memory title to delete</title></delete></memory_action>
-- If no memory action needed: <memory_action/>`;
-
   // Step 1: Directly embed the user's query, search memories, filter top K
   let queryVector: number[] = [];
   let scoredList: any[] = [];
@@ -316,7 +310,8 @@ AT THE END OF YOUR RESPONSE:
         .slice(0, MAX_CONTEXT_MEMORIES);
       finalSurvivingMemories = filtered.map((c: any) => c.memory);
       if (finalSurvivingMemories.length > 0) {
-        memoryContextStr = "\n\nRELEVANT MEMORIES FROM PAST CONVERSATIONS:\n" + formatSystemInstruction(finalSurvivingMemories);
+        memoryContextStr = "\n\nRELEVANT MEMORIES FROM PAST CONVERSATIONS:\n" + 
+          finalSurvivingMemories.map(mem => `[${mem.title} - ${mem.category}]\n${mem.memory}`).join("\n\n");
         memoryFound = true;
       }
     } catch (err) {
@@ -326,8 +321,8 @@ AT THE END OF YOUR RESPONSE:
 
   // Step 2: Full streaming call with optional memory context
   const systemInstruction = memoryFound
-    ? MEMORY_BASE_INSTRUCTION + memoryContextStr
-    : MEMORY_BASE_INSTRUCTION;
+    ? DEFAULT_SYSTEM_ROLE + memoryContextStr
+    : DEFAULT_SYSTEM_ROLE;
 
   let searchUsed = false;
   let searchQueries: string[] = [];
