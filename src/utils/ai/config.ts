@@ -1,5 +1,5 @@
 // Config file for Gemini API integration
-export const GEMINI_API_KEY: string = "AIzaSyB7cxaeZhWMy61WGxWQkj3FoKFD0WJeiRs";
+export const GEMINI_API_KEY: string = import.meta.env.VITE_GEMINI_API_KEY || "";
 
 // Model inference default settings (Gemma 4 configuration)
 export const DEFAULT_TEMPERATURE = 0.7;
