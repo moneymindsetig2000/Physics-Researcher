@@ -1,12 +1,9 @@
-import { GoogleGenAI, ThinkingLevel } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 import {
   GEMINI_API_KEY,
   CANDIDATE_POOL_SIZE,
   MAX_CONTEXT_MEMORIES,
-  RELEVANCE_THRESHOLD,
-  DEFAULT_TEMPERATURE,
-  DEFAULT_TOP_P,
-  DEFAULT_CUSTOM_INSTRUCTIONS
+  RELEVANCE_THRESHOLD
 } from "./config";
 import type { MemoryRecord, TraceRecord } from "./types";
 import { rankMemories, formatSystemInstruction } from "../pipeline/pipeline";
@@ -92,6 +89,95 @@ export async function embedText(
   throw new Error("No embedding values returned from Gemini API");
 }
 
+/**
+ * Create a raw REST streaming connection to the Google AI API, bypassing the
+ * @google/genai SDK.
+ */
+async function createRawStream(
+  model: string,
+  contents: any[],
+  config: {
+    systemInstruction?: any;
+    tools?: any[];
+    thinkingConfig?: { thinkingLevel: string };
+  },
+  signal?: AbortSignal
+): Promise<AsyncGenerator<any>> {
+  const url = new URL(`https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent`);
+  url.searchParams.set('alt', 'sse');
+
+  const body: Record<string, any> = { contents };
+  if (config.systemInstruction) body.systemInstruction = config.systemInstruction;
+  if (config.tools) body.tools = config.tools;
+  if (config.thinkingConfig) {
+    body.generationConfig = { thinkingConfig: config.thinkingConfig };
+  }
+
+  const response = await fetch(url.toString(), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Goog-Api-Key': GEMINI_API_KEY,
+    },
+    body: JSON.stringify(body),
+    signal,
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    const err: any = new Error(`HTTP ${response.status}: ${errorText}`);
+    err.status = response.status;
+    throw err;
+  }
+
+  return sseGenerator(response);
+}
+
+async function* sseGenerator(response: Response): AsyncGenerator<any> {
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error('Response body is empty');
+
+  const decoder = new TextDecoder('utf-8');
+  let buffer = '';
+  const dataPrefix = 'data:';
+  const delimiters = ['\n\n', '\r\r', '\r\n\r\n'];
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+
+      while (true) {
+        let delimiterIndex = -1;
+        let delimiterLength = 0;
+        for (const delimiter of delimiters) {
+          const index = buffer.indexOf(delimiter);
+          if (index !== -1 && (delimiterIndex === -1 || index < delimiterIndex)) {
+            delimiterIndex = index;
+            delimiterLength = delimiter.length;
+          }
+        }
+        if (delimiterIndex === -1) break;
+
+        const eventString = buffer.substring(0, delimiterIndex);
+        buffer = buffer.substring(delimiterIndex + delimiterLength);
+        const trimmedEvent = eventString.trim();
+
+        if (trimmedEvent.startsWith(dataPrefix)) {
+          const jsonStr = trimmedEvent.substring(dataPrefix.length).trim();
+          if (jsonStr) {
+            yield JSON.parse(jsonStr);
+          }
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 export interface PipelineResult {
   replyText: string;
   trace: TraceRecord;
@@ -100,616 +186,71 @@ export interface PipelineResult {
 }
 
 /**
- * Execute the 10-step memory-retrieval and LLM pipeline sequentially
- * Line-to-line match with the memory-management repository implementation, modified for strict sequential execution.
+ * Build the contents array from chat history + current user query for Gemma 4 API.
+ * Strips thought tags and memory_action XML from previous model turns to prevent 500 errors.
  */
-export async function runQueryPipeline(
+function buildContents(
+  chatHistory: { sender: 'user' | 'ai'; text: string }[] | undefined,
   userQuery: string,
-  memories: MemoryRecord[],
-  thinkingToggleIsHigh: boolean
-): Promise<PipelineResult> {
-  const ai = getAIClient();
-
-  // STEP 1 — Reasoning Decision (Gemma 4 31B naturally decides if long-term memory is required)
-  let memoryRequired = false;
-  let decisionReason = "";
-
-  try {
-    const decisionResponse = await callWithRetry(() => ai.models.generateContent({
-      model: "gemma-4-26b-a4b-it",
-      contents: `User Message:
-"${userQuery}"
-
-Task: Decide whether additional long-term memory/context from past conversations, preference profiles, or research notes is actually needed to answer this request correctly.
-
-Examples where memory is usually NOT required:
-- Greetings (e.g. "hi", "hello", "good morning")
-- Casual conversation (e.g. "how are you?", "what is your name?")
-- Standalone physics questions (e.g. "Explain string theory", "What is quantum entanglement?")
-- General knowledge (e.g. "Who wrote Hamlet?", "What is the capital of France?")
-- Simple calculations (e.g. "2+2", "15% of 80")
-- One-time requests that do not depend on past info
-
-Examples where memory IS likely required:
-- Follow-up questions or requests referencing past events/conversations (e.g. "What did we talk about earlier?", "Do you remember my paper?")
-- User preferences (e.g. "How did I want my citations formatted?", "Summarize this according to my preferences")
-- Ongoing research projects
-- Citation preferences
-- "Continue..." or "Keep going" type requests
-- Anything depending on previously stored information
-
-Respond ONLY as a JSON object:
-{
-  "memoryRequired": boolean,
-  "reason": "A short, concise explanation (1-2 sentences) of why memory/context is or is not required."
-}
-DO NOT include any <think> or <thought> tags. Output raw JSON only.`,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: "object",
-          properties: {
-            memoryRequired: { type: "boolean" },
-            reason: { type: "string" }
-          },
-          required: ["memoryRequired", "reason"]
-        }
+  images?: { mimeType: string; base64Data: string }[]
+): ({ role: string; parts: ({ text: string } | { inlineData: { mimeType: string; data: string } })[] })[] {
+  const contents: ({ role: string; parts: ({ text: string } | { inlineData: { mimeType: string; data: string } })[] })[] = [];
+  if (chatHistory) {
+    for (const msg of chatHistory) {
+      const role = msg.sender === 'ai' ? 'model' : 'user';
+      let text = msg.text;
+      if (role === 'model') {
+        text = text
+          .replace(/<thought>[\s\S]*?<\/thought>/gi, '')
+          .replace(/<think>[\s\S]*?<\/think>/gi, '')
+          .replace(/<\|channel>thought[\s\S]*?<channel\|>/gi, '')
+          .replace(/<memory_action>[\s\S]*?<\/memory_action>/gi, '')
+          .replace(/<memory_action\s*\/>/gi, '')
+          .trim();
       }
-    }));
-
-    if (decisionResponse.text) {
-      const parsed = JSON.parse(decisionResponse.text.trim());
-      memoryRequired = !!parsed.memoryRequired;
-      decisionReason = parsed.reason || "Evaluated request context.";
+      if (text) {
+        contents.push({ role, parts: [{ text }] });
+      }
     }
-  } catch (error) {
-    console.error("Error making memory requirement reasoning decision:", error);
-    memoryRequired = true;
-    decisionReason = "Fallback due to decision error.";
   }
-
-  // Retrieval pipeline variables
-  let queryVector: number[] = [];
-  let scoredList: any[] = [];
-  let candidatePool: any[] = [];
-  let eligibleCandidates: any[] = [];
-  let finalSurvivingMemories: MemoryRecord[] = [];
-  let rerankerTable: any[] = [];
-  let finalContextSelection: any[] = [];
-  let builtSystemInstruction = "";
-
-  if (memoryRequired) {
-    queryVector = await embedText(userQuery, "RETRIEVAL_QUERY");
-    const rankResult = rankMemories(userQuery, queryVector, memories);
-    scoredList = rankResult.scoredList;
-    candidatePool = rankResult.candidatePool;
-
-    // LLM Relevance Reranker (evaluated strictly sequential to prevent parallel 500 crashes)
-    const rerankerResults = [];
-    for (const item of candidatePool) {
-      const mem = item.memory;
-      const finalRankScore = item.finalRankScore;
-      try {
-        const prompt = `User Query:
-"${userQuery}"
-
-Candidate Memory:
-Title:
-${mem.title}
-
-Memory:
-${mem.memory}
-
-Determine whether this memory would genuinely help answer the user's request.
-Respond ONLY as JSON. DO NOT include any <think> or <thought> tags.
-
-Schema:
-{
-  "relevant": boolean,
-  "confidence": number,
-  "reason": string
-}
-
-Rules:
-A memory is relevant only if it would improve the current answer.
-Being in the same broad scientific field is NOT sufficient.
-Do NOT approve memories merely because they mention physics.
-Project memories should only be included if they directly relate to the user's request.
-Research notes should only be included if they materially improve the answer.
-User preferences are always considered relevant whenever they affect response formatting or explanation style.`;
-
-        const res = await callWithRetry(() => ai.models.generateContent({
-          model: "gemma-4-26b-a4b-it",
-          contents: prompt,
-          config: {
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: "object",
-              properties: {
-                relevant: { type: "boolean" },
-                confidence: { type: "number" },
-                reason: { type: "string" }
-              },
-              required: ["relevant", "confidence", "reason"]
-            }
-          }
-        }), 6, 2000);
-
-        if (res.text) {
-          const parsed = JSON.parse(res.text.trim());
-          rerankerResults.push({
-            memory: mem,
-            finalRankScore,
-            relevant: !!parsed.relevant,
-            confidence: typeof parsed.confidence === 'number' ? parsed.confidence : 1.0,
-            reason: parsed.reason || "Processed successfully."
-          });
-          continue;
-        }
-      } catch (error) {
-        console.error(`Error reranking memory "${mem.title}":`, error);
-      }
-      rerankerResults.push({
-        memory: mem,
-        finalRankScore: false,
-        relevant: false,
-        confidence: 0,
-        reason: "LLM Reranker encountered an evaluation error or returned invalid output."
-      });
+  const userParts: ({ text: string } | { inlineData: { mimeType: string; data: string } })[] = [];
+  if (images) {
+    for (const img of images) {
+      userParts.push({ inlineData: { mimeType: img.mimeType, data: img.base64Data } });
     }
-
-    eligibleCandidates = rerankerResults.filter(r => r.relevant && r.finalRankScore >= RELEVANCE_THRESHOLD);
-    const sortedEligible = [...eligibleCandidates].sort((a, b) => {
-      if (b.confidence !== a.confidence) {
-        return b.confidence - a.confidence;
-      }
-      return b.finalRankScore - a.finalRankScore;
-    });
-
-    const finalSurvivingCandidates = sortedEligible.slice(0, MAX_CONTEXT_MEMORIES);
-    finalSurvivingMemories = finalSurvivingCandidates.map(c => c.memory);
-
-    rerankerTable = rerankerResults.map(res => {
-      const isFinallyInjected = finalSurvivingMemories.some(m => m.id === res.memory.id);
-      return {
-        title: res.memory.title,
-        relevant: res.relevant,
-        confidence: res.confidence,
-        reason: res.reason,
-        status: (isFinallyInjected ? 'Included' : 'Removed') as 'Included' | 'Removed'
-      };
-    });
-
-    finalContextSelection = finalSurvivingCandidates.map((c, idx) => ({
-      rank: idx + 1,
-      title: c.memory.title,
-      confidence: c.confidence,
-      finalScore: c.finalRankScore
-    }));
-
-    builtSystemInstruction = formatSystemInstruction(finalSurvivingMemories);
-  } else {
-    builtSystemInstruction = "";
   }
-
-  // Call the main reasoning model
-  const mainModel = "gemma-4-26b-a4b-it";
-  const mainResponse = await callWithRetry(() => ai.models.generateContent({
-    model: mainModel,
-    contents: userQuery,
-    config: {
-      ...(builtSystemInstruction ? { systemInstruction: { role: 'system', parts: [{ text: builtSystemInstruction }] } } : {}),
-      thinkingConfig: {
-        thinkingLevel: ThinkingLevel.HIGH
-      }
-    }
-  }));
-
-  const replyText = mainResponse.text || "No response text generated by the model.";
-  const groundingMetadata = mainResponse.candidates?.[0]?.groundingMetadata;
-  const searchQueries = groundingMetadata?.webSearchQueries || [];
-  const searchSources = groundingMetadata?.groundingChunks?.map(chunk => ({
-    title: chunk.web?.title || chunk.web?.uri || "Web Source",
-    uri: chunk.web?.uri || ""
-  })).filter(src => src.uri !== "") || [];
-  const searchUsed = !!(searchQueries.length > 0 || searchSources.length > 0);
-
-  // Memory Evaluation (strictly formatted for Gemma JSON compliance)
-  let evalResult = {
-    shouldSave: false,
-    shouldDelete: false,
-    deleteMemoryTitle: "",
-    reason: "No evaluation processed.",
-    title: "",
-    description: "",
-    category: "",
-    memory: "",
-    importance: 5
-  };
-  let newMemoryCreated: MemoryRecord | undefined = undefined;
-  let deletedMemoryId: string | undefined = undefined;
-
-  try {
-    const memorySummaryText = memories.map(m => `- ID: "${m.id}", Title: "${m.title}", Memory content: "${m.memory}"`).join("\n");
-    const cleanedReplyText = replyText.length > 1000 ? replyText.slice(0, 1000) + "... [truncated]" : replyText;
-    const evalResponse = await callWithRetry(() => ai.models.generateContent({
-      model: mainModel,
-      contents: `User said: "${userQuery}"\nAssistant replied: "${cleanedReplyText}"\n\nAll existing memories currently stored in the memory bank:\n${memorySummaryText || "None"}\n\nTask:\n1. Did the user state a new durable, reusable preference, fact, or project detail that should be saved? Set shouldSave to true.\n2. Did the user explicitly ask to delete, forget, or remove a previously saved memory/fact? Set shouldDelete to true, and set deleteMemoryTitle to the EXACT title or ID of that memory from the database list above.\n3. Provide the reason for your evaluation in the "reason" field.\n\nImportant Rules:\n- Return a valid JSON object matching the schema exactly.\n- DO NOT output any <think> or <thought> tags.\n- For any string fields that are not applicable (e.g., deleteMemoryTitle, title, description, category, memory), you MUST provide an empty string "".\n- For the importance field, provide 0 if not applicable.`,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: "object",
-          properties: {
-            shouldSave: { type: "boolean" },
-            shouldDelete: { type: "boolean" },
-            deleteMemoryTitle: { type: "string" },
-            reason: { type: "string" },
-            title: { type: "string" },
-            description: { type: "string" },
-            category: { type: "string" },
-            memory: { type: "string" },
-            importance: { type: "number" }
-          },
-          required: [
-            "shouldSave",
-            "shouldDelete",
-            "deleteMemoryTitle",
-            "reason",
-            "title",
-            "description",
-            "category",
-            "memory",
-            "importance"
-          ]
-        }
-      }
-    }));
-
-    if (evalResponse.text) {
-      const parsed = JSON.parse(evalResponse.text.trim());
-      evalResult = { ...evalResult, ...parsed };
-
-      if (evalResult.shouldDelete && evalResult.deleteMemoryTitle) {
-        const queryClean = evalResult.deleteMemoryTitle.trim().toLowerCase();
-        const matched = memories.find(m =>
-          m.id.toLowerCase() === queryClean ||
-          m.title.toLowerCase() === queryClean ||
-          m.title.toLowerCase().includes(queryClean) ||
-          queryClean.includes(m.title.toLowerCase())
-        );
-        if (matched) {
-          deletedMemoryId = matched.id;
-        }
-      }
-
-      if (evalResult.shouldSave && evalResult.memory) {
-        const memoryVector = await embedText(evalResult.memory, "RETRIEVAL_DOCUMENT");
-        const randomIdSuffix = typeof crypto?.randomUUID === 'function'
-          ? crypto.randomUUID().slice(0, 8)
-          : Math.random().toString(36).substring(2, 10);
-
-        newMemoryCreated = {
-          id: "mem_" + randomIdSuffix,
-          title: evalResult.title || "User Preference Note",
-          description: evalResult.description || "Inferred from conversation.",
-          category: evalResult.category || "General",
-          memory: evalResult.memory,
-          importance: typeof evalResult.importance === 'number' ? Math.max(0, Math.min(10, evalResult.importance)) : 5,
-          createdAt: Date.now(),
-          embedding: memoryVector
-        };
-      }
-    }
-  } catch (err) {
-    console.error("Memory evaluation step encountered an error:", err);
-    evalResult.reason = "Evaluation step error: " + (err instanceof Error ? err.message : String(err));
-  }
-
-  const trace: TraceRecord = {
-    queryText: userQuery,
-    queryEmbeddingLength: queryVector.length,
-    retrievalTable: scoredList,
-    systemInstructionSent: builtSystemInstruction,
-    searchUsed,
-    searchQueries,
-    searchSources,
-    thinkingLevel: thinkingToggleIsHigh ? 'High' : 'Minimal',
-    evalResult: {
-      shouldSave: evalResult.shouldSave,
-      shouldDelete: evalResult.shouldDelete,
-      deleteMemoryTitle: evalResult.deleteMemoryTitle,
-      reason: evalResult.reason,
-      newMemory: newMemoryCreated ? {
-        id: newMemoryCreated.id,
-        title: newMemoryCreated.title,
-        description: newMemoryCreated.description,
-        category: newMemoryCreated.category,
-        memory: newMemoryCreated.memory,
-        importance: newMemoryCreated.importance,
-        createdAt: newMemoryCreated.createdAt
-      } : undefined
-    },
-    rerankerTable,
-    totalMemoriesStored: memories.length,
-    semanticSearchReturned: memories.length,
-    passedScoreThreshold: candidatePool.length,
-    passedLlmRelevanceCheck: eligibleCandidates.length,
-    injectedIntoModelContext: finalSurvivingMemories.length,
-    candidatePoolSize: CANDIDATE_POOL_SIZE,
-    candidatesPassedToLlm: candidatePool.length,
-    relevantMemoriesReturned: eligibleCandidates.length,
-    finalContextSelection: finalContextSelection,
-    memoryRequired,
-    decisionReason
-  };
-
-  return {
-    replyText,
-    trace,
-    newMemoryCreated,
-    deletedMemoryId
-  };
+  userParts.push({ text: userQuery });
+  contents.push({ role: 'user', parts: userParts });
+  return contents;
 }
 
 /**
- * Execute the 10-step memory-retrieval and LLM pipeline sequentially with streaming response.
- * Uses exact prompts, models, and steps from the memory-management workflow, with sequential execution to prevent 500s.
+ * Simplified streaming pipeline:
+ *   Step 1: Embed the user's query directly → search memories → filter top K.
+ *   Step 2: Stream the main model (gemma-4-26b-a4b-it) with memory context + google search + thinking.
+ *           Model generates answer and ends with <memory_action> XML for save/delete.
+ * Chat history is properly formatted (thoughts stripped) to prevent 500s on subsequent messages.
  */
 export async function runQueryPipelineStream(
   userQuery: string,
   memories: MemoryRecord[],
   onChunk: (data: { text: string; thought: string }) => void,
-  chatHistory: { sender: 'user' | 'ai'; text: string }[] = [],
+  chatHistory?: { sender: 'user' | 'ai'; text: string }[],
   images?: { mimeType: string; base64Data: string }[],
   pdfs?: { mimeType: string; base64Data: string }[],
   signal?: AbortSignal
 ): Promise<PipelineResult> {
   const ai = getAIClient();
 
-  // STEP 1 — Reasoning Decision (Gemma 4 31B naturally decides if long-term memory is required)
-  let memoryRequired = false;
-  let decisionReason = "";
-
   if (signal?.aborted) {
     throw new DOMException("The user aborted a request.", "AbortError");
   }
-  try {
-    const decisionResponse = await callWithRetry(() => ai.models.generateContent({
-      model: "gemma-4-26b-a4b-it",
-      contents: `User Message:
-"${userQuery}"
 
-Task: Decide whether additional long-term memory/context from past conversations, preference profiles, or research notes is actually needed to answer this request correctly.
+  const contents = buildContents(chatHistory, userQuery, images);
 
-Examples where memory is usually NOT required:
-- Greetings (e.g. "hi", "hello", "good morning")
-- Casual conversation (e.g. "how are you?", "what is your name?")
-- Standalone physics questions (e.g. "Explain string theory", "What is quantum entanglement?")
-- General knowledge (e.g. "Who wrote Hamlet?", "What is the capital of France?")
-- Simple calculations (e.g. "2+2", "15% of 80")
-- One-time requests that do not depend on past info
-
-Examples where memory IS likely required:
-- Follow-up questions or requests referencing past events/conversations (e.g. "What did we talk about earlier?", "Do you remember my paper?")
-- User preferences (e.g. "How did I want my citations formatted?", "Summarize this according to my preferences")
-- Ongoing research projects
-- Citation preferences
-- "Continue..." or "Keep going" type requests
-- Anything depending on previously stored information
-
-Respond ONLY as a JSON object:
-{
-  "memoryRequired": boolean,
-  "reason": "A short, concise explanation (1-2 sentences) of why memory/context is or is not required."
-}
-DO NOT include any <think> or <thought> tags. Output raw JSON only.`,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: "object",
-          properties: {
-            memoryRequired: { type: "boolean" },
-            reason: { type: "string" }
-          },
-          required: ["memoryRequired", "reason"]
-        }
-      }
-    }, { signal }), 4, 1500, signal);
-
-    if (decisionResponse.text) {
-      const parsed = JSON.parse(decisionResponse.text.trim());
-      memoryRequired = !!parsed.memoryRequired;
-      decisionReason = parsed.reason || "Evaluated request context.";
-    }
-  } catch (error) {
-    console.error("Error making memory requirement reasoning decision:", error);
-    memoryRequired = true;
-    decisionReason = "Fallback due to decision error.";
-  }
-
-  // Retrieval pipeline variables
-  let queryVector: number[] = [];
-  let scoredList: any[] = [];
-  let candidatePool: any[] = [];
-  let eligibleCandidates: any[] = [];
-  let finalSurvivingMemories: MemoryRecord[] = [];
-  let rerankerTable: any[] = [];
-  let finalContextSelection: any[] = [];
-  let builtSystemInstruction = "";
-
-  if (memoryRequired) {
-    queryVector = await embedText(userQuery, "RETRIEVAL_QUERY");
-    const rankResult = rankMemories(userQuery, queryVector, memories);
-    scoredList = rankResult.scoredList;
-    candidatePool = rankResult.candidatePool;
-
-    // LLM Relevance Reranker (evaluated sequentially one by one to prevent parallel API 500 errors)
-    const rerankerResults = [];
-    for (const item of candidatePool) {
-      const mem = item.memory;
-      const finalRankScore = item.finalRankScore;
-      try {
-        if (signal?.aborted) {
-          throw new DOMException("The user aborted a request.", "AbortError");
-        }
-        const prompt = `User Query:
-"${userQuery}"
-
-Candidate Memory:
-Title:
-${mem.title}
-
-Memory:
-${mem.memory}
-
-Determine whether this memory would genuinely help answer the user's request.
-Respond ONLY as JSON. DO NOT include any <think> or <thought> tags.
-
-Schema:
-{
-  "relevant": boolean,
-  "confidence": number,
-  "reason": string
-}
-
-Rules:
-A memory is relevant only if it would improve the current answer.
-Being in the same broad scientific field is NOT sufficient.
-Do NOT approve memories merely because they mention physics.
-Project memories should only be included if they directly relate to the user's request.
-Research notes should only be included if they materially improve the answer.
-User preferences are always considered relevant whenever they affect response formatting or explanation style.`;
-
-        const res = await callWithRetry(() => ai.models.generateContent({
-          model: "gemma-4-26b-a4b-it",
-          contents: prompt,
-          config: {
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: "object",
-              properties: {
-                relevant: { type: "boolean" },
-                confidence: { type: "number" },
-                reason: { type: "string" }
-              },
-              required: ["relevant", "confidence", "reason"]
-            }
-          }
-        }, { signal }), 6, 2000, signal);
-
-        if (res.text) {
-          const parsed = JSON.parse(res.text.trim());
-          rerankerResults.push({
-            memory: mem,
-            finalRankScore,
-            relevant: !!parsed.relevant,
-            confidence: typeof parsed.confidence === 'number' ? parsed.confidence : 1.0,
-            reason: parsed.reason || "Processed successfully."
-          });
-          continue;
-        }
-      } catch (error) {
-        console.error(`Error reranking memory "${mem.title}":`, error);
-      }
-
-      rerankerResults.push({
-        memory: mem,
-        finalRankScore: false,
-        relevant: false,
-        confidence: 0,
-        reason: "LLM Reranker encountered an evaluation error or returned invalid output."
-      });
-    }
-
-    eligibleCandidates = rerankerResults.filter(r => r.relevant && r.finalRankScore >= RELEVANCE_THRESHOLD);
-    const sortedEligible = [...eligibleCandidates].sort((a, b) => {
-      if (b.confidence !== a.confidence) {
-        return b.confidence - a.confidence;
-      }
-      return b.finalRankScore - a.finalRankScore;
-    });
-
-    const finalSurvivingCandidates = sortedEligible.slice(0, MAX_CONTEXT_MEMORIES);
-    finalSurvivingMemories = finalSurvivingCandidates.map(c => c.memory);
-
-    rerankerTable = rerankerResults.map(res => {
-      const isFinallyInjected = finalSurvivingMemories.some(m => m.id === res.memory.id);
-      return {
-        title: res.memory.title,
-        relevant: res.relevant,
-        confidence: res.confidence,
-        reason: res.reason,
-        status: (isFinallyInjected ? 'Included' : 'Removed') as 'Included' | 'Removed'
-      };
-    });
-
-    finalContextSelection = finalSurvivingCandidates.map((c, idx) => ({
-      rank: idx + 1,
-      title: c.memory.title,
-      confidence: c.confidence,
-      finalScore: c.finalRankScore
-    }));
-
-    builtSystemInstruction = formatSystemInstruction(finalSurvivingMemories);
-  } else {
-    builtSystemInstruction = "";
-  }
-
-  // Load dynamic model parameters from localStorage with fallback to file configs
-  const storedTemp = typeof window !== 'undefined' ? localStorage.getItem('physica_ai_temperature') : null;
-  const storedTopP = typeof window !== 'undefined' ? localStorage.getItem('physica_ai_top_p') : null;
-  const storedInstructions = typeof window !== 'undefined' ? localStorage.getItem('physica_ai_custom_instructions') : null;
-
-  const temperature = storedTemp !== null ? parseFloat(storedTemp) : DEFAULT_TEMPERATURE;
-  const topP = storedTopP !== null ? parseFloat(storedTopP) : DEFAULT_TOP_P;
-  const customInstructions = storedInstructions !== null ? storedInstructions : DEFAULT_CUSTOM_INSTRUCTIONS;
-
-  // Format conversation history for single-turn robustness to prevent tool use 500 errors
-  let historyContext = "";
-  if (chatHistory && chatHistory.length > 0) {
-    historyContext = "Recent Conversation History:\n" + chatHistory.map(turn => {
-      const senderName = turn.sender === 'user' ? 'User' : 'Assistant';
-      return `${senderName}: ${turn.text}`;
-    }).join("\n") + "\n\n";
-  }
-
-  // Append user custom instructions to the final builtSystemInstruction
-  let finalSystemInstruction = builtSystemInstruction;
-  if (customInstructions && customInstructions.trim()) {
-    finalSystemInstruction = finalSystemInstruction
-      ? `${finalSystemInstruction}\n\nAdditional Instructions:\n${customInstructions}`
-      : customInstructions;
-  }
-
-  if (historyContext) {
-    finalSystemInstruction = finalSystemInstruction
-      ? `${historyContext}${finalSystemInstruction}`
-      : historyContext;
-  }
-
-  // Call the main reasoning model with web search grounding (STREAMING)
-  const mainModel = "gemma-4-26b-a4b-it";
-  let searchUsed = false;
-  let searchQueries: string[] = [];
-  let searchSources: any[] = [];
-  let replyText = "";
-  let accumulatedThought = "";
-
-  // Single-turn payload to bypass Google API's multi-turn tool validation crashes
-  const userParts: any[] = [{ text: userQuery }];
-  if (images && images.length > 0) {
-    images.forEach(img => {
-      userParts.push({
-        inlineData: {
-          mimeType: img.mimeType,
-          data: img.base64Data
-        }
-      });
-    });
-  }
-  // PDFs: gemma-4-26b-a4b-it does NOT support application/pdf via inlineData (causes 500 error).
-  // Must use File API upload + fileData URI reference (officially supported method).
-  if (pdfs && pdfs.length > 0) {
+  // Handle PDFs via File API (inlineData causes 500 errors on gemma-4-26b-a4b-it)
+  if (pdfs && pdfs.length > 0 && contents.length > 0) {
+    const lastContent = contents[contents.length - 1];
     for (const pdf of pdfs) {
       try {
         const byteString = atob(pdf.base64Data);
@@ -722,30 +263,23 @@ User preferences are always considered relevant whenever they affect response fo
           file: blob,
           config: { mimeType: pdf.mimeType }
         });
-
         if (!uploadResult || !uploadResult.name) {
           throw new Error("PDF upload failed or returned no file name.");
         }
-
-        // VERIFIED FIX: Wait for the PDF to complete server-side processing to prevent 500 errors.
-        // Files uploaded to the Gemini API enter a PROCESSING state. Attempting to generate content
-        // with a file that is still PROCESSING causes an Internal Server Error (500) on gemma models.
         let fileInfo = await ai.files.get({ name: uploadResult.name });
         while (fileInfo.state === "PROCESSING") {
           await new Promise(resolve => setTimeout(resolve, 2000));
           fileInfo = await ai.files.get({ name: uploadResult.name });
         }
-
         if (fileInfo.state === "FAILED") {
           console.error(`PDF processing failed on Google backend for file: ${uploadResult.name}`);
           continue;
         }
-
         const fileUri = fileInfo.uri || uploadResult.uri;
         if (fileUri) {
-          userParts.push({
+          (lastContent.parts as any[]).push({
             fileData: {
-              fileUri: fileUri,
+              fileUri,
               mimeType: fileInfo.mimeType || uploadResult.mimeType || pdf.mimeType
             }
           });
@@ -756,14 +290,51 @@ User preferences are always considered relevant whenever they affect response fo
     }
   }
 
-  const apiContents = [
-    {
-      role: 'user',
-      parts: userParts
-    }
-  ];
+  const MEMORY_BASE_INSTRUCTION = `You are a helpful physics research assistant with access to a memory bank of past conversations, preferences, and research notes.
 
-  // Setup throttling for smooth chunks streaming (Apple aesthetic UX)
+AT THE END OF YOUR RESPONSE:
+- If the user shared a new preference, fact, or project detail worth saving: <memory_action><save><title>Short Title</title><description>Brief description</description><category>Category</category><memory>The full memory content to save</memory><importance>5</importance></save></memory_action>
+- If the user asked to delete/forget a memory: <memory_action><delete><title>Exact memory title to delete</title></delete></memory_action>
+- If no memory action needed: <memory_action/>`;
+
+  // Step 1: Directly embed the user's query, search memories, filter top K
+  let queryVector: number[] = [];
+  let scoredList: any[] = [];
+  let candidatePool: any[] = [];
+  let finalSurvivingMemories: MemoryRecord[] = [];
+  let memoryContextStr = "";
+  let memoryFound = false;
+
+  if (memories.length > 0) {
+    try {
+      queryVector = await embedText(userQuery, "RETRIEVAL_QUERY");
+      const rankResult = rankMemories(userQuery, queryVector, memories);
+      scoredList = rankResult.scoredList;
+      candidatePool = rankResult.candidatePool;
+      const filtered = rankResult.candidatePool
+        .filter((c: any) => c.finalRankScore >= RELEVANCE_THRESHOLD)
+        .slice(0, MAX_CONTEXT_MEMORIES);
+      finalSurvivingMemories = filtered.map((c: any) => c.memory);
+      if (finalSurvivingMemories.length > 0) {
+        memoryContextStr = "\n\nRELEVANT MEMORIES FROM PAST CONVERSATIONS:\n" + formatSystemInstruction(finalSurvivingMemories);
+        memoryFound = true;
+      }
+    } catch (err) {
+      console.warn("Memory search failed, proceeding without memory:", err);
+    }
+  }
+
+  // Step 2: Full streaming call with optional memory context
+  const systemInstruction = memoryFound
+    ? MEMORY_BASE_INSTRUCTION + memoryContextStr
+    : MEMORY_BASE_INSTRUCTION;
+
+  let searchUsed = false;
+  let searchQueries: string[] = [];
+  let searchSources: any[] = [];
+  let replyText = "";
+  let accumulatedThought = "";
+
   let pendingText = "";
   let pendingThought = "";
   let throttleTimeout: NodeJS.Timeout | null = null;
@@ -771,12 +342,11 @@ User preferences are always considered relevant whenever they affect response fo
   const throttledOnChunk = (text: string, thought: string) => {
     pendingText = text;
     pendingThought = thought;
-
     if (!throttleTimeout) {
       throttleTimeout = setTimeout(() => {
         onChunk({ text: pendingText, thought: pendingThought });
         throttleTimeout = null;
-      }, 35); // ~30 fps update rate for buttery smooth rendering
+      }, 35);
     }
   };
 
@@ -786,7 +356,6 @@ User preferences are always considered relevant whenever they affect response fo
 
   while (streamRetries > 0 && !streamSuccess) {
     try {
-      // Reset buffers on retry
       replyText = "";
       accumulatedThought = "";
 
@@ -794,24 +363,24 @@ User preferences are always considered relevant whenever they affect response fo
         throw new DOMException("The user aborted a request.", "AbortError");
       }
 
-      const responseStream = await callWithRetry(() => ai.models.generateContentStream({
-        model: mainModel,
-        contents: apiContents,
-        config: {
-          ...(finalSystemInstruction ? { systemInstruction: { role: 'system', parts: [{ text: finalSystemInstruction }] } } : {}),
-          ...(useSearchTool ? { tools: [{ googleSearch: {} }] } : {}),
-          thinkingConfig: {
-            thinkingLevel: ThinkingLevel.HIGH
-          },
-          temperature,
-          topP
-        }
-      }, { signal }), 3, 1500, signal);
+      const config: any = {
+        systemInstruction: { role: 'system', parts: [{ text: systemInstruction }] },
+        ...(useSearchTool ? { tools: [{ googleSearch: {} }] } : {}),
+        thinkingConfig: { thinkingLevel: 'HIGH' }
+      };
+
+      const responseStream = await callWithRetry(() => createRawStream(
+        "gemma-4-26b-a4b-it",
+        contents,
+        config,
+        signal
+      ), 2, 1000, signal);
 
       for await (const chunk of responseStream) {
         if (signal?.aborted) {
           throw new DOMException("The user aborted a request.", "AbortError");
         }
+
         const groundingMetadata = chunk.candidates?.[0]?.groundingMetadata;
         if (groundingMetadata) {
           searchUsed = searchUsed || !!(groundingMetadata.webSearchQueries && groundingMetadata.webSearchQueries.length > 0);
@@ -819,11 +388,11 @@ User preferences are always considered relevant whenever they affect response fo
             searchQueries = Array.from(new Set([...searchQueries, ...groundingMetadata.webSearchQueries]));
           }
           if (groundingMetadata.groundingChunks) {
-            const chunksMapped = groundingMetadata.groundingChunks.map(c => ({
-              title: c.web?.title || c.web?.uri || "Web Source",
-              uri: c.web?.uri || ""
-            })).filter(src => src.uri !== "");
-            searchSources = [...searchSources, ...chunksMapped];
+            for (const c of groundingMetadata.groundingChunks) {
+              const title = c.web?.title || c.web?.uri || "Web Source";
+              const uri = c.web?.uri || "";
+              if (uri) searchSources.push({ title, uri });
+            }
           }
         }
 
@@ -854,11 +423,11 @@ User preferences are always considered relevant whenever they affect response fo
       streamRetries--;
       const errStr = String(err);
 
-      // If it is a 500 error and we were using the search tool, fallback to no-search
       if (useSearchTool && (errStr.includes("500") || errStr.includes("INTERNAL"))) {
         console.warn("Google Search grounding failed on Gemma model with 500 error. Falling back to search-disabled request...");
         useSearchTool = false;
-        streamRetries++; // Don't consume a retry attempt for the fallback trigger
+        streamRetries++;
+        await new Promise(resolve => setTimeout(resolve, 1500));
         continue;
       }
 
@@ -882,7 +451,6 @@ User preferences are always considered relevant whenever they affect response fo
     clearTimeout(throttleTimeout);
   }
 
-  // Deduplicate search sources
   const seenUris = new Set<string>();
   searchSources = searchSources.filter(src => {
     if (seenUris.has(src.uri)) return false;
@@ -900,116 +468,60 @@ User preferences are always considered relevant whenever they affect response fo
     finalThought = parsed.thought;
   }
 
+  // Parse <memory_action> XML for save/delete
+  const parsedXml = parseMemoryActionXml(finalReplyText);
+  finalReplyText = parsedXml.cleanText;
+
   onChunk({ text: finalReplyText, thought: finalThought });
 
-  // STEP 10: Memory Evaluation (strictly formatted for Gemma JSON compliance)
-  let evalResult = {
-    shouldSave: false,
-    shouldDelete: false,
-    deleteMemoryTitle: "",
-    reason: "No evaluation processed.",
-    title: "",
-    description: "",
-    category: "",
-    memory: "",
-    importance: 5
-  };
   let newMemoryCreated: MemoryRecord | undefined = undefined;
   let deletedMemoryId: string | undefined = undefined;
 
-  try {
-    if (signal?.aborted) {
-      throw new DOMException("The user aborted a request.", "AbortError");
+  if (parsedXml.shouldDelete && parsedXml.deleteMemoryTitle) {
+    const queryClean = parsedXml.deleteMemoryTitle.trim().toLowerCase();
+    const matched = memories.find(m =>
+      m.id.toLowerCase() === queryClean ||
+      m.title.toLowerCase() === queryClean ||
+      m.title.toLowerCase().includes(queryClean) ||
+      queryClean.includes(m.title.toLowerCase())
+    );
+    if (matched) {
+      deletedMemoryId = matched.id;
     }
-    const memorySummaryText = memories.map(m => `- ID: "${m.id}", Title: "${m.title}", Memory content: "${m.memory}"`).join("\n");
-    const cleanedReplyText = finalReplyText.length > 1000 ? finalReplyText.slice(0, 1000) + "... [truncated]" : finalReplyText;
-    const evalResponse = await callWithRetry(() => ai.models.generateContent({
-      model: mainModel,
-      contents: `User said: "${userQuery}"\nAssistant replied: "${cleanedReplyText}"\n\nAll existing memories currently stored in the memory bank:\n${memorySummaryText || "None"}\n\nTask:\n1. Did the user state a new durable, reusable preference, fact, or project detail that should be saved? Set shouldSave to true.\n2. Did the user explicitly ask to delete, forget, or remove a previously saved memory/fact? Set shouldDelete to true, and set deleteMemoryTitle to the EXACT title or ID of that memory from the database list above.\n3. Provide the reason for your evaluation in the "reason" field.\n\nImportant Rules:\n- Return a valid JSON object matching the schema exactly.\n- DO NOT output any <think> or <thought> tags.\n- For any string fields that are not applicable (e.g., deleteMemoryTitle, title, description, category, memory), you MUST provide an empty string "".\n- For the importance field, provide 0 if not applicable.`,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: "object",
-          properties: {
-            shouldSave: { type: "boolean" },
-            shouldDelete: { type: "boolean" },
-            deleteMemoryTitle: { type: "string" },
-            reason: { type: "string" },
-            title: { type: "string" },
-            description: { type: "string" },
-            category: { type: "string" },
-            memory: { type: "string" },
-            importance: { type: "number" }
-          },
-          required: [
-            "shouldSave",
-            "shouldDelete",
-            "deleteMemoryTitle",
-            "reason",
-            "title",
-            "description",
-            "category",
-            "memory",
-            "importance"
-          ]
-        }
-      }
-    }, { signal }), 4, 1500, signal);
+  }
 
-    if (evalResponse.text) {
-      const parsed = JSON.parse(evalResponse.text.trim());
-      evalResult = { ...evalResult, ...parsed };
+  if (parsedXml.shouldSave && parsedXml.memory) {
+    const memoryVector = await embedText(parsedXml.memory, "RETRIEVAL_DOCUMENT");
+    const randomIdSuffix = typeof crypto?.randomUUID === 'function'
+      ? crypto.randomUUID().slice(0, 8)
+      : Math.random().toString(36).substring(2, 10);
 
-      if (evalResult.shouldDelete && evalResult.deleteMemoryTitle) {
-        const queryClean = evalResult.deleteMemoryTitle.trim().toLowerCase();
-        const matched = memories.find(m =>
-          m.id.toLowerCase() === queryClean ||
-          m.title.toLowerCase() === queryClean ||
-          m.title.toLowerCase().includes(queryClean) ||
-          queryClean.includes(m.title.toLowerCase())
-        );
-        if (matched) {
-          deletedMemoryId = matched.id;
-        }
-      }
-
-      if (evalResult.shouldSave && evalResult.memory) {
-        const memoryVector = await embedText(evalResult.memory, "RETRIEVAL_DOCUMENT");
-        const randomIdSuffix = typeof crypto?.randomUUID === 'function'
-          ? crypto.randomUUID().slice(0, 8)
-          : Math.random().toString(36).substring(2, 10);
-
-        newMemoryCreated = {
-          id: "mem_" + randomIdSuffix,
-          title: evalResult.title || "User Preference Note",
-          description: evalResult.description || "Inferred from conversation.",
-          category: evalResult.category || "General",
-          memory: evalResult.memory,
-          importance: typeof evalResult.importance === 'number' ? Math.max(0, Math.min(10, evalResult.importance)) : 5,
-          createdAt: Date.now(),
-          embedding: memoryVector
-        };
-      }
-    }
-  } catch (err) {
-    console.error("Memory evaluation step encountered an error:", err);
-    evalResult.reason = "Evaluation step error: " + (err instanceof Error ? err.message : String(err));
+    newMemoryCreated = {
+      id: "mem_" + randomIdSuffix,
+      title: parsedXml.title || "User Preference Note",
+      description: parsedXml.description || "Inferred from conversation.",
+      category: parsedXml.category || "General",
+      memory: parsedXml.memory,
+      importance: parsedXml.importance,
+      createdAt: Date.now(),
+      embedding: memoryVector
+    };
   }
 
   const trace: TraceRecord = {
     queryText: userQuery,
     queryEmbeddingLength: queryVector.length,
     retrievalTable: scoredList,
-    systemInstructionSent: builtSystemInstruction,
+    systemInstructionSent: systemInstruction,
     searchUsed,
     searchQueries,
     searchSources,
     thinkingLevel: 'High',
     evalResult: {
-      shouldSave: evalResult.shouldSave,
-      shouldDelete: evalResult.shouldDelete,
-      deleteMemoryTitle: evalResult.deleteMemoryTitle,
-      reason: evalResult.reason,
+      shouldSave: parsedXml.shouldSave,
+      shouldDelete: parsedXml.shouldDelete,
+      deleteMemoryTitle: parsedXml.deleteMemoryTitle,
+      reason: "Parsed from response XML block.",
       newMemory: newMemoryCreated ? {
         id: newMemoryCreated.id,
         title: newMemoryCreated.title,
@@ -1020,18 +532,20 @@ User preferences are always considered relevant whenever they affect response fo
         createdAt: newMemoryCreated.createdAt
       } : undefined
     },
-    rerankerTable,
+    rerankerTable: [],
     totalMemoriesStored: memories.length,
     semanticSearchReturned: memories.length,
     passedScoreThreshold: candidatePool.length,
-    passedLlmRelevanceCheck: eligibleCandidates.length,
+    passedLlmRelevanceCheck: 0,
     injectedIntoModelContext: finalSurvivingMemories.length,
     candidatePoolSize: CANDIDATE_POOL_SIZE,
     candidatesPassedToLlm: candidatePool.length,
-    relevantMemoriesReturned: eligibleCandidates.length,
-    finalContextSelection: finalContextSelection,
-    memoryRequired,
-    decisionReason
+    relevantMemoriesReturned: 0,
+    finalContextSelection: [],
+    memoryRequired: memoryFound,
+    decisionReason: memoryFound
+      ? `Memory searched for user query — ${finalSurvivingMemories.length} results injected.`
+      : "No relevant memories found for user query."
   };
 
   return {
@@ -1040,6 +554,71 @@ User preferences are always considered relevant whenever they affect response fo
     newMemoryCreated,
     deletedMemoryId
   };
+}
+
+/**
+ * Parses a <memory_action> XML block from the model's response text.
+ * Extracts save/delete actions and returns cleaned text (with XML stripped).
+ */
+function parseMemoryActionXml(text: string): {
+  cleanText: string;
+  shouldSave: boolean;
+  shouldDelete: boolean;
+  deleteMemoryTitle: string;
+  title: string;
+  description: string;
+  category: string;
+  memory: string;
+  importance: number;
+} {
+  const result = {
+    cleanText: text,
+    shouldSave: false,
+    shouldDelete: false,
+    deleteMemoryTitle: "",
+    title: "",
+    description: "",
+    category: "",
+    memory: "",
+    importance: 5
+  };
+
+  const selfClosing = text.match(/<memory_action\s*\/>\s*$/i);
+  if (selfClosing) {
+    result.cleanText = text.slice(0, selfClosing.index).trimEnd();
+    return result;
+  }
+
+  const match = text.match(/<memory_action>([\s\S]*?)<\/memory_action>/i);
+  if (!match) return result;
+
+  const xmlContent = match[1];
+  result.cleanText = text.replace(/<memory_action>[\s\S]*?<\/memory_action>/, "").trimEnd();
+
+  const saveMatch = xmlContent.match(/<save>([\s\S]*?)<\/save>/i);
+  if (saveMatch) {
+    result.shouldSave = true;
+    const s = saveMatch[1];
+    const t = s.match(/<title>([\s\S]*?)<\/title>/i);
+    if (t) result.title = t[1].trim();
+    const d = s.match(/<description>([\s\S]*?)<\/description>/i);
+    if (d) result.description = d[1].trim();
+    const c = s.match(/<category>([\s\S]*?)<\/category>/i);
+    if (c) result.category = c[1].trim();
+    const m = s.match(/<memory>([\s\S]*?)<\/memory>/i);
+    if (m) result.memory = m[1].trim();
+    const imp = s.match(/<importance>([\s\S]*?)<\/importance>/i);
+    if (imp) result.importance = Math.max(1, Math.min(10, parseInt(imp[1].trim(), 10) || 5));
+  }
+
+  const deleteMatch = xmlContent.match(/<delete>([\s\S]*?)<\/delete>/i);
+  if (deleteMatch) {
+    result.shouldDelete = true;
+    const dl = deleteMatch[1].match(/<title>([\s\S]*?)<\/title>/i);
+    if (dl) result.deleteMemoryTitle = dl[1].trim();
+  }
+
+  return result;
 }
 
 /**

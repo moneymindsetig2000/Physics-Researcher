@@ -176,7 +176,7 @@ export function ChatPage() {
       id: aiMsgId,
       sender: 'ai',
       text: '',
-      thought: 'Evaluating memory bank and initializing reasoning stream...'
+      thought: undefined
     };
 
     let currentChatId = activeChatId;

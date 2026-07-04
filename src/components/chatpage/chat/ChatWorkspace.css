@@ -607,6 +607,7 @@
   max-width: 820px;
   margin: 0 auto;
   scrollbar-width: thin;
+  scroll-behavior: smooth;
 
   /* GPU Layer Acceleration for butter-smooth scroll performance */
   will-change: transform;
@@ -763,6 +764,45 @@
   color: rgba(255, 255, 255, 0.45);
   border-left: 1px dashed rgba(255, 255, 255, 0.1);
   padding-left: 12px;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+  transition: max-height 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.thinking-content.collapsed {
+  max-height: 120px;
+}
+
+.thinking-content.expanded {
+  max-height: 400px;
+}
+
+.thinking-toggle-btn {
+  margin-left: auto;
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.thinking-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.8);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.ai-message-loader {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem 0.25rem;
+  color: rgba(255, 255, 255, 0.5);
+  font-family: var(--font-sans);
+  font-size: 1.05rem;
 }
 
 /* Custom Message Formatter Classes */

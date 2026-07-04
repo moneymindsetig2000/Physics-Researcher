@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { motion } from 'motion/react';
 import { createPortal } from 'react-dom';
 import { WorkspaceHeader } from './ui/WorkspaceHeader';
 import { WelcomeState } from './ui/WelcomeState';
@@ -6,6 +7,7 @@ import { ComposerInput } from './ui/ComposerInput';
 import { WorkspaceFooter } from './ui/WorkspaceFooter';
 import { ArchitectureTraceBlock } from './ui/ArchitectureTraceBlock';
 import { MarkdownRenderer } from './ui/markdowns/MarkdownRenderer';
+import ThinkingLoader from './ui/ThinkingLoader';
 import type { TraceRecord } from '../../../utils/ai/types';
 import './ChatWorkspace.css';
 
@@ -43,6 +45,15 @@ const MessageItem = React.memo(({
   msg: Message;
   onImageClick?: (url: string) => void;
 }) => {
+  const [isThinkingExpanded, setIsThinkingExpanded] = useState(false);
+  const thinkingContentRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (thinkingContentRef.current) {
+      thinkingContentRef.current.scrollTo({ top: thinkingContentRef.current.scrollHeight, behavior: 'smooth' });
+    }
+  }, [msg.thought]);
+
   const handleDownloadPdf = (pdfDataUrl: string) => {
     try {
       const link = document.createElement('a');
@@ -98,15 +109,37 @@ const MessageItem = React.memo(({
       ) : (
         <div className="ai-message-ground">
           {msg.thought && (
-            <div className="ai-thinking-box">
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+              className="ai-thinking-box"
+            >
               <div className="thinking-header">
                 <span className="thinking-dot"></span>
                 <span>Thinking Process</span>
+                <button
+                  className="thinking-toggle-btn"
+                  onClick={() => setIsThinkingExpanded(prev => !prev)}
+                  title={isThinkingExpanded ? 'Collapse' : 'Expand'}
+                >
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    {isThinkingExpanded
+                      ? <polyline points="18 15 12 9 6 15" />
+                      : <polyline points="6 9 12 15 18 9" />
+                    }
+                  </svg>
+                </button>
               </div>
-              <div className="thinking-content">{msg.thought}</div>
-            </div>
+              <div ref={thinkingContentRef} className={`thinking-content ${isThinkingExpanded ? 'expanded' : 'collapsed'}`}>{msg.thought}</div>
+            </motion.div>
           )}
           {msg.text && <MarkdownRenderer content={msg.text} />}
+          {!msg.thought && !msg.text && (
+            <div className="ai-message-loader">
+              <ThinkingLoader />
+            </div>
+          )}
           {msg.trace && <ArchitectureTraceBlock trace={msg.trace} />}
         </div>
       )}
@@ -141,6 +174,14 @@ export function ChatWorkspace({
 }: ChatWorkspaceProps) {
   const [message, setMessage] = useState('');
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const conversationFlowRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (conversationFlowRef.current && activeChat?.messages.length) {
+      const el = conversationFlowRef.current;
+      conversationFlowRef.current.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    }
+  }, [activeChat?.messages]);
 
   const handleSend = (
     attachedImages: string[], 
@@ -167,7 +208,7 @@ export function ChatWorkspace({
         <div className="workspace-blur-overlay-top" />
 
         {activeChat && activeChat.messages.length > 0 ? (
-          <div className="conversation-flow" id="conversation-flow-list">
+          <div className="conversation-flow" id="conversation-flow-list" ref={conversationFlowRef}>
             {activeChat.messages.map((msg) => (
               <MessageItem 
                 key={msg.id} 
