@@ -126,6 +126,11 @@ export function CTASection() {
     document.getElementById("workspace-preview")?.scrollIntoView({ behavior: "smooth" });
   };
 
+  const navigateToChat = () => {
+    window.history.pushState({}, '', '/chat');
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  };
+
   return (
     <section className="cta-section" id="final-cta">
       <div className="cta-container">
@@ -163,14 +168,14 @@ export function CTASection() {
               <button 
                 className="cta-btn cta-btn-primary btn-liquid-glass-style" 
                 id="cta-explore"
-                onClick={handleScrollToTop}
+                onClick={navigateToChat}
               >
                 Explore Research
               </button>
               <button 
                 className="cta-btn cta-btn-secondary btn-liquid-glass-style" 
                 id="cta-workspace"
-                onClick={handleScrollToWorkspace}
+                onClick={navigateToChat}
               >
                 View Research Workspace
               </button>

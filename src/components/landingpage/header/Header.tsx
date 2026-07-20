@@ -1,6 +1,11 @@
 import './Header.css';
 
 export function Header() {
+  const handleSignUp = () => {
+    window.history.pushState({}, '', '/chat');
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  };
+
   return (
     <header className="floating-header" id="main-header">
       <div className="header-inner">
@@ -25,7 +30,7 @@ export function Header() {
 
         {/* CTA Action */}
         <div className="action-button-group">
-          <button className="btn-request" id="btn-header-access">
+          <button className="btn-request" id="btn-header-access" onClick={handleSignUp}>
             Sign up
           </button>
         </div>

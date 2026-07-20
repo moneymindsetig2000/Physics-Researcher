@@ -249,6 +249,11 @@ export function HeroContent() {
     document.getElementById("features")?.scrollIntoView({ behavior: "smooth" })
   }
 
+  const navigateToChat = () => {
+    window.history.pushState({}, '', '/chat');
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  };
+
   return (
     <div className="hero-container">
       {/* Background WebGL Shader Canvas */}
@@ -278,7 +283,7 @@ export function HeroContent() {
             </div>
 
             {/* Liquid Glass Button */}
-            <button className="btn-liquid-glass" id="btn-lets-go" onClick={handleScrollToFeatures}>
+            <button className="btn-liquid-glass" id="btn-lets-go" onClick={navigateToChat}>
               Let's Go
             </button>
           </div>

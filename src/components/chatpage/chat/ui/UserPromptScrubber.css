@@ -1,0 +1,127 @@
+.scrubber-track {
+  position: absolute;
+  right: 0;
+  top: 80px;
+  bottom: 24px;
+  width: 28px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+}
+
+.scrubber-dots-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  width: 100%;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.scrubber-dots-wrap::-webkit-scrollbar {
+  display: none;
+}
+
+.scrubber-dots-wrap::before,
+.scrubber-dots-wrap::after {
+  content: '';
+  flex: 1;
+  pointer-events: none;
+}
+
+.scrubber-dots {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  pointer-events: auto;
+  flex-shrink: 0;
+}
+
+.scrubber-dot {
+  width: 20px;
+  height: 5px;
+  border-radius: 3px;
+  background: #ffffff;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: opacity 0.15s ease;
+  opacity: 0.7;
+}
+
+.scrubber-dot:hover {
+  opacity: 1;
+}
+
+.scrubber-popup {
+  position: absolute;
+  right: calc(100% + 14px);
+  top: 50%;
+  translate: 0 -50%;
+  transform-origin: right center;
+  background: rgba(22, 22, 26, 0.85);
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 0.2rem 0;
+  min-width: 200px;
+  max-width: 320px;
+  pointer-events: auto;
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.6),
+    0 0 0 0.5px rgba(255, 255, 255, 0.04),
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.08);
+  max-height: min(360px, 60vh);
+}
+
+.scrubber-popup-inner {
+  max-height: inherit;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+
+.scrubber-popup-inner::-webkit-scrollbar {
+  width: 4px;
+}
+
+.scrubber-popup-inner::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrubber-popup-inner::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 2px;
+}
+
+.scrubber-popup-item {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', system-ui, sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.88);
+  line-height: 1.35;
+  padding: 0.45rem 0.75rem;
+  cursor: pointer;
+  transition: background 0.12s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.scrubber-popup-item:first-child {
+  border-top-left-radius: 10px;
+  border-top-right-radius: 10px;
+}
+
+.scrubber-popup-item:last-child {
+  border-bottom-left-radius: 10px;
+  border-bottom-right-radius: 10px;
+}
+
+.scrubber-popup-item:hover {
+  background: rgba(255, 255, 255, 0.07);
+}

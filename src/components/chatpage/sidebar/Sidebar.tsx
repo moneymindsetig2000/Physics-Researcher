@@ -5,6 +5,7 @@ import { SidebarNavItem } from './ui/SidebarNavItem';
 import { UserProfileBar } from './ui/UserProfileBar';
 import { SettingsModal } from '../settings/SettingsModal';
 import { DeleteConfirmationModal } from './options/DeleteConfirmationModal';
+import { DashboardConfirmationModal } from './options/DashboardConfirmationModal';
 import type { MemoryRecord } from '../../../utils/ai/types';
 import './Sidebar.css';
 
@@ -44,6 +45,7 @@ export const Sidebar = React.memo(function Sidebar({
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSettingsClosing, setIsSettingsClosing] = useState(false);
   const [chatToDelete, setChatToDelete] = useState<Chat | null>(null);
+  const [showDashboardModal, setShowDashboardModal] = useState(false);
 
   const handleCloseSettings = () => {
     setIsSettingsClosing(true);
@@ -176,6 +178,14 @@ export const Sidebar = React.memo(function Sidebar({
       </motion.div>
 
       {/* User Section */}
+      <div className="sidebar-footer-actions">
+        <button className="dashboard-nav-btn" id="btn-dashboard-nav" onClick={() => setShowDashboardModal(true)}>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+          </svg>
+          <span>Go to Dashboard</span>
+        </button>
+      </div>
       <UserProfileBar onOpenSettings={() => setIsSettingsOpen(true)} />
 
       {/* Settings Modal Portal Overlay */}
@@ -199,6 +209,17 @@ export const Sidebar = React.memo(function Sidebar({
           }
         }}
         onCancel={() => setChatToDelete(null)}
+      />
+
+      {/* Dashboard Confirmation Modal */}
+      <DashboardConfirmationModal
+        isOpen={showDashboardModal}
+        onConfirm={() => {
+          setShowDashboardModal(false);
+          window.history.pushState({}, '', '/');
+          window.dispatchEvent(new PopStateEvent('popstate'));
+        }}
+        onCancel={() => setShowDashboardModal(false)}
       />
     </aside>
   );

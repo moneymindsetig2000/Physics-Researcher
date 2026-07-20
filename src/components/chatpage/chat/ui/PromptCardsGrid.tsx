@@ -8,26 +8,26 @@ export function PromptCardsGrid({ onSelectPrompt }: PromptCardsGridProps) {
       <button 
         className="prompt-card" 
         id="card-updated"
-        onClick={() => onSelectPrompt("Latest preprints on the muon g-2 anomaly.")}
+        onClick={() => onSelectPrompt("Latest experimental constraints on dark matter from LUX-ZEPLIN and PandaX-4T.")}
       >
         <span className="card-label">Stay Updated</span>
-        <p className="card-text">Latest preprints on the muon g-2 anomaly.</p>
+        <p className="card-text">Latest experimental constraints on dark matter from LUX-ZEPLIN and PandaX-4T.</p>
       </button>
       <button 
         className="prompt-card" 
         id="card-research"
-        onClick={() => onSelectPrompt("Anomaly constraints on dark matter candidate couplings.")}
+        onClick={() => onSelectPrompt("Derivation of the Gross-Pitaevskii equation and its application to Bose-Einstein condensates.")}
       >
         <span className="card-label">Research</span>
-        <p className="card-text">Anomaly constraints on dark matter candidate couplings.</p>
+        <p className="card-text">Derivation of the Gross-Pitaevskii equation and its application to Bose-Einstein condensates.</p>
       </button>
       <button 
         className="prompt-card" 
         id="card-learn"
-        onClick={() => onSelectPrompt("Detailed explanation of topological phase transitions.")}
+        onClick={() => onSelectPrompt("Explain the renormalization group and its application to critical phenomena.")}
       >
         <span className="card-label">Learn a topic</span>
-        <p className="card-text">Detailed explanation of topological phase transitions.</p>
+        <p className="card-text">Explain the renormalization group and its application to critical phenomena.</p>
       </button>
     </div>
   );

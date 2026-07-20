@@ -1,0 +1,174 @@
+.dashboard-modal-wrapper {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999999;
+}
+
+.dashboard-modal-blur-backdrop {
+  position: absolute;
+  inset: 0;
+  background-color: rgba(2, 2, 4, 0.65);
+  z-index: 1;
+  will-change: opacity;
+  animation: backdropFadeIn 0.18s linear forwards;
+}
+
+.dashboard-modal-wrapper.closing .dashboard-modal-blur-backdrop {
+  animation: backdropFadeOut 0.2s linear forwards;
+}
+
+.dashboard-modal-container {
+  position: relative;
+  z-index: 2;
+  width: 440px;
+  max-width: 90vw;
+  background-color: #020204;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  box-shadow: 
+    0 20px 50px rgba(0, 0, 0, 0.7),
+    0 0 30px rgba(255, 255, 255, 0.03),
+    inset 0 1px 1px rgba(255, 255, 255, 0.08);
+  padding: 1.75rem;
+  box-sizing: border-box;
+  animation: dashboardZoomIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+
+.dashboard-modal-wrapper.closing .dashboard-modal-container {
+  animation: dashboardZoomOut 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.dashboard-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.dashboard-modal-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background-color: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.dashboard-modal-header h3 {
+  font-family: var(--font-sans);
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #ffffff;
+  margin: 0;
+}
+
+.dashboard-modal-body {
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 1.75rem;
+}
+
+.dashboard-modal-body p {
+  margin: 0 0 0.75rem 0;
+}
+
+.dashboard-modal-body p:last-child {
+  margin-bottom: 0;
+}
+
+.dashboard-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.dashboard-modal-btn {
+  height: 36px;
+  padding: 0 1.25rem;
+  border-radius: 8px;
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  font-weight: 550;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.dashboard-modal-btn.cancel-btn {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.dashboard-modal-btn.cancel-btn:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+  transform: scale(1.03);
+}
+
+.dashboard-modal-btn.cancel-btn:active {
+  transform: scale(0.97);
+}
+
+.dashboard-modal-btn.confirm-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.8);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.dashboard-modal-btn.confirm-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: #ffffff;
+  transform: scale(1.03) translateY(-1px);
+  box-shadow: 0 6px 20px rgba(255, 255, 255, 0.08);
+}
+
+.dashboard-modal-btn.confirm-btn:active {
+  transform: scale(0.97) translateY(0);
+}
+
+@keyframes backdropFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes backdropFadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes dashboardZoomIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes dashboardZoomOut {
+  from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.97) translateY(4px);
+  }
+}

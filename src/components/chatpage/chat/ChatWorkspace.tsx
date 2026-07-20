@@ -8,6 +8,7 @@ import { WorkspaceFooter } from './ui/WorkspaceFooter';
 import { ArchitectureTraceBlock } from './ui/ArchitectureTraceBlock';
 import { MarkdownRenderer } from './ui/markdowns/MarkdownRenderer';
 import ThinkingLoader from './ui/ThinkingLoader';
+import { UserPromptScrubber } from './ui/UserPromptScrubber';
 import type { TraceRecord } from '../../../utils/ai/types';
 import './ChatWorkspace.css';
 
@@ -68,7 +69,7 @@ const MessageItem = React.memo(({
   };
 
   return (
-    <div className={`message-row ${msg.sender === 'user' ? 'user-row' : 'ai-row'}`}>
+    <div className={`message-row ${msg.sender === 'user' ? 'user-row' : 'ai-row'}`} data-message-id={msg.id}>
       {msg.sender === 'user' ? (
         <div className="user-message-wrapper">
           {msg.images && msg.images.length > 0 && (
@@ -116,7 +117,6 @@ const MessageItem = React.memo(({
               className="ai-thinking-box"
             >
               <div className="thinking-header">
-                <span className="thinking-dot"></span>
                 <span>Thinking Process</span>
                 <button
                   className="thinking-toggle-btn"
@@ -237,6 +237,13 @@ export function ChatWorkspace({
           />
         </div>
       </main>
+
+      {activeChat && activeChat.messages.length > 0 && (
+        <UserPromptScrubber 
+          messages={activeChat.messages.filter(m => m.sender === 'user').map(m => ({ id: m.id, text: m.text }))}
+          containerRef={conversationFlowRef}
+        />
+      )}
 
       {/* Workspace Footer */}
       <WorkspaceFooter />

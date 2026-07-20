@@ -11,14 +11,14 @@ import { Footer } from "./components/landingpage/footer/Footer"
 import { ChatPage } from "./components/chatpage/ChatPage"
 
 function App() {
-  const [isChat, setIsChat] = useState(window.location.hash === "#chat")
+  const [isChat, setIsChat] = useState(window.location.pathname === "/chat")
 
   useEffect(() => {
-    const handleHashChange = () => {
-      setIsChat(window.location.hash === "#chat")
+    const handleRouteChange = () => {
+      setIsChat(window.location.pathname === "/chat")
     }
-    window.addEventListener("hashchange", handleHashChange)
-    return () => window.removeEventListener("hashchange", handleHashChange)
+    window.addEventListener("popstate", handleRouteChange)
+    return () => window.removeEventListener("popstate", handleRouteChange)
   }, [])
 
   if (isChat) {
