@@ -5,13 +5,36 @@
 /* ── Block Math (display mode) ──────────────────────────────────────────── */
 .block-math-wrapper {
   margin: 1.25rem 0;
-  padding: 1rem 1.25rem;
-  background: rgba(255, 255, 255, 0.02);
-  border-radius: 8px;
-  border-left: 3.5px solid rgba(255, 255, 255, 0.18);
+  padding: 1.25rem 1.5rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
   overflow-x: auto;
   display: flex;
   justify-content: center;
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.06),
+    inset 0 -1px 1px rgba(0, 0, 0, 0.15),
+    0 6px 20px rgba(0, 0, 0, 0.25);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+}
+
+.block-math-wrapper::-webkit-scrollbar {
+  height: 5px;
+}
+
+.block-math-wrapper::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.block-math-wrapper::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
+}
+
+.block-math-wrapper::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
 }
 
 /* ── Inline Math ──────────────────────────────────────────────────────────  */

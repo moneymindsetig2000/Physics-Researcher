@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { createPortal } from 'react-dom';
 import { WorkspaceHeader } from './ui/WorkspaceHeader';
 import { WelcomeState } from './ui/WelcomeState';
@@ -11,6 +11,7 @@ import ThinkingLoader from './ui/ThinkingLoader';
 import { UserPromptScrubber } from './ui/UserPromptScrubber';
 import { ConversationDivider } from './ui/ConversationDivider';
 import { MessageActions } from './ui/MessageActions';
+import { SelectionToolbar } from './ui/SelectionToolbar';
 import type { TraceRecord } from '../../../utils/ai/types';
 import './ChatWorkspace.css';
 
@@ -43,10 +44,12 @@ interface ChatWorkspaceProps {
 
 const MessageItem = React.memo(({ 
   msg,
-  onImageClick
+  onImageClick,
+  onPdfClick
 }: { 
   msg: Message;
   onImageClick?: (url: string) => void;
+  onPdfClick?: (url: string) => void;
 }) => {
   const [isThinkingExpanded, setIsThinkingExpanded] = useState(false);
   const thinkingContentRef = useRef<HTMLDivElement>(null);
@@ -91,12 +94,12 @@ const MessageItem = React.memo(({
           {msg.pdfs && msg.pdfs.length > 0 && (
             <div className="user-message-files-row">
               {msg.pdfs.map((pdf, idx) => (
-                <div 
-                  key={idx} 
-                  className="message-file-card" 
-                  onClick={() => handleDownloadPdf(pdf)}
-                  title="Click to download PDF"
-                >
+                  <div 
+                    key={idx} 
+                    className="message-file-card" 
+                    onClick={() => onPdfClick?.(pdf)}
+                    title="Click to preview PDF"
+                  >
                   <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="message-file-card-icon">
                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                     <polyline points="14 2 14 8 20 8"></polyline>
@@ -179,7 +182,23 @@ export function ChatWorkspace({
 }: ChatWorkspaceProps) {
   const [message, setMessage] = useState('');
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [previewPdf, setPreviewPdf] = useState<string | null>(null);
+  const [taggedText, setTaggedText] = useState<string | null>(null);
+  const [showTaggedPill, setShowTaggedPill] = useState(false);
+  const [selectionState, setSelectionState] = useState<{
+    text: string;
+    position: { top: number; left: number; width: number } | null;
+  } | null>(null);
   const conversationFlowRef = useRef<HTMLDivElement>(null);
+  const hasActiveSelectionRef = useRef(false);
+
+  useEffect(() => {
+    if (taggedText) setShowTaggedPill(true);
+  }, [taggedText]);
+
+  const handleExitComplete = () => {
+    if (!taggedText) setShowTaggedPill(false);
+  };
 
   useEffect(() => {
     if (conversationFlowRef.current && activeChat?.messages.length) {
@@ -188,13 +207,86 @@ export function ChatWorkspace({
     }
   }, [activeChat?.messages]);
 
+  useEffect(() => {
+    const hasSelection = () => {
+      const sel = window.getSelection();
+      if (!sel || sel.isCollapsed || !sel.toString().trim()) return null;
+
+      let node = sel.anchorNode;
+      let el: Element | null = node?.nodeType === 3 ? node.parentElement : node as Element;
+
+      while (el) {
+        if (el.classList?.contains('ai-message-ground')) return sel;
+        el = el.parentElement;
+      }
+      return null;
+    };
+
+    let rafId: number | null = null;
+
+    const handleSelection = () => {
+      if (rafId !== null) return;
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        const sel = hasSelection();
+        if (!sel) {
+          if (hasActiveSelectionRef.current) {
+            hasActiveSelectionRef.current = false;
+            setSelectionState(null);
+          }
+          return;
+        }
+        hasActiveSelectionRef.current = true;
+        const range = sel.getRangeAt(0);
+        const rect = range.getBoundingClientRect();
+        setSelectionState({
+          text: sel.toString().trim(),
+          position: {
+            top: rect.top,
+            left: Math.max(12, rect.left),
+            width: rect.width,
+          },
+        });
+      });
+    };
+
+    document.addEventListener('selectionchange', handleSelection);
+    return () => {
+      document.removeEventListener('selectionchange', handleSelection);
+      if (rafId !== null) cancelAnimationFrame(rafId);
+    };
+  }, []);
+
+  const handleAskAi = (text: string) => {
+    setTaggedText(text);
+    setSelectionState(null);
+    window.getSelection()?.removeAllRanges();
+  };
+
+  const handleDownloadPdf = (pdfDataUrl: string) => {
+    const link = document.createElement('a');
+    link.href = pdfDataUrl;
+    link.download = 'document.pdf';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleClearTaggedText = () => {
+    setTaggedText(null);
+  };
+
   const handleSend = (
-    attachedImages: string[], 
+    attachedImages: string[],
     attachedPdfs: string[]
   ) => {
-    if (!message.trim() && attachedImages.length === 0 && attachedPdfs.length === 0) return;
-    onSendPrompt(message, attachedImages, attachedPdfs);
+    if (!message.trim() && attachedImages.length === 0 && attachedPdfs.length === 0 && !taggedText) return;
+    const finalMessage = taggedText
+      ? `"${taggedText}"\n\n${message}`
+      : message;
+    onSendPrompt(finalMessage, attachedImages, attachedPdfs);
     setMessage('');
+    setTaggedText(null);
   };
 
   return (
@@ -220,7 +312,7 @@ export function ChatWorkspace({
               return (
                 <React.Fragment key={msg.id}>
                   {showDivider && <ConversationDivider />}
-                  <MessageItem msg={msg} onImageClick={setPreviewImage} />
+                  <MessageItem msg={msg} onImageClick={setPreviewImage} onPdfClick={setPreviewPdf} />
                 </React.Fragment>
               );
             })}
@@ -232,18 +324,51 @@ export function ChatWorkspace({
         {/* Bottom Blur Overlay */}
         <div className="workspace-blur-overlay-bottom" />
 
-        {/* Bottom Composer and Tools Container */}
-        <div className="composer-container">
-          {/* Chat Input Capsule */}
-          <ComposerInput 
-            message={message} 
-            onChange={setMessage} 
-            onSend={handleSend} 
-            onImageClick={setPreviewImage}
-            isGenerating={isGenerating}
-            onStopGeneration={onStopGeneration}
-          />
-        </div>
+          {/* Bottom Composer and Tools Container */}
+          <div className={`composer-container${showTaggedPill ? ' has-tagged' : ''}`}>
+            {/* Tagged text pill above input */}
+            <AnimatePresence onExitComplete={handleExitComplete}>
+              {taggedText && (
+                <motion.div
+                  key="tagged-pill"
+                  className="tagged-text-pill"
+                  initial={{ opacity: 0, y: 28 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 32 }}
+                  transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                >
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" className="tagged-text-icon">
+                    <path d="M6 17h3l2-4V7H5v6h3zm8 0h3l2-4V7h-6v6h3z" />
+                  </svg>
+                  <div className="tagged-text-label"><MarkdownRenderer content={taggedText} /></div>
+                  <button className="tagged-text-remove" onClick={handleClearTaggedText} aria-label="Remove tagged text">
+                    <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+            {/* Chat Input Capsule */}
+            <ComposerInput 
+              message={message} 
+              onChange={setMessage} 
+              onSend={handleSend} 
+              onImageClick={setPreviewImage}
+              isGenerating={isGenerating}
+              onStopGeneration={onStopGeneration}
+            />
+          </div>
+
+          {selectionState && (
+            <SelectionToolbar
+              selectedText={selectionState.text}
+              position={selectionState.position}
+              onAskAi={handleAskAi}
+              onDismiss={() => setSelectionState(null)}
+            />
+          )}
       </main>
 
       {activeChat && activeChat.messages.length > 0 && (
@@ -271,6 +396,53 @@ export function ChatWorkspace({
               </svg>
             </button>
             <img src={previewImage} alt="Fullscreen Preview" className="image-fullscreen-content" />
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Fullscreen PDF Preview Modal */}
+      {previewPdf && createPortal(
+        <div className="image-fullscreen-overlay" onClick={() => setPreviewPdf(null)}>
+          <div className="pdf-fullscreen-container" onClick={(e) => e.stopPropagation()}>
+            <div className="pdf-fullscreen-header">
+              <div className="pdf-fullscreen-title">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                </svg>
+                <span>PDF Preview</span>
+              </div>
+              <div className="pdf-fullscreen-actions">
+                <button
+                  className="pdf-fullscreen-download-btn"
+                  onClick={() => handleDownloadPdf(previewPdf)}
+                  title="Download PDF"
+                >
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                  Download
+                </button>
+                <button 
+                  className="image-fullscreen-close-btn" 
+                  onClick={() => setPreviewPdf(null)}
+                  aria-label="Close preview"
+                >
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <iframe
+              src={previewPdf}
+              className="pdf-fullscreen-viewer"
+              title="PDF Preview"
+            />
           </div>
         </div>,
         document.body

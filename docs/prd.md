@@ -4,7 +4,7 @@
 > **Code Name:** Researcher  
 > **Tagline:** "The Research Partner Built For Physics."  
 > **Version:** 0.0.0  
-> **Stack:** React 19 + Vite 8 + TypeScript 6 + Google Jessie
+> **Stack:** React 19 + Vite 8 + TypeScript 6 + Jessie
 
 ---
 
@@ -85,7 +85,7 @@ Modern researchers face an overwhelming amount of scientific literature. Thousan
 - Delete memories on user request
 
 ### 3.5 Web Search Grounding
-- Google Search integration for up-to-date information
+- Web search integration for up-to-date information
 - Automatically falls back to non-search mode on 500 errors
 
 ### 3.6 Thinking / Reasoning
@@ -93,7 +93,7 @@ Modern researchers face an overwhelming amount of scientific literature. Thousan
 - Visible thinking box with expand/collapse and auto-scroll
 
 ### 3.7 PDF Processing
-- Upload PDFs via Google File API (not inlineData)
+- Upload PDFs via File API (not inlineData)
 - Polling-based processing status monitoring
 
 ### 3.8 LaTeX / Math Rendering
@@ -132,11 +132,10 @@ Modern researchers face an overwhelming amount of scientific literature. Thousan
 └────────────────────────────────────────────┼────────────────┘
                                              │
                     ┌────────────────────────┼────────────────────────┐
-                    │           Google AI API (HTTPS)                │
+                    │                 our server                        │
                     │  ┌─────────────────┐  ┌────────────────────┐  │
-                    │  │  Embedding API  │  │  Jessie       │  │
-                    │  │  (gemini-embed- │  │  StreamGenerate    │  │
-                    │  │  ding-2-preview)│  │  Content (REST)    │  │
+                     │  │  Embedding API  │  │  Jessie            │  │
+                     │  │  (embedding)   │  │  StreamGenerate    │  │
                     │  └─────────────────┘  └────────────────────┘  │
                     │  ┌─────────────────┐                          │
                     │  │  File API       │                          │
@@ -159,7 +158,7 @@ Modern researchers face an overwhelming amount of scientific literature. Thousan
 ### AI & API
 | Package | Version | Purpose |
 |---------|---------|---------|
-| @google/genai | ^2.10.0 | Embedding + File API (SDK) |
+| — (AI SDK) | ^2.10.0 | Embedding + File API (SDK) |
 | — (raw fetch) | — | Main model streaming (bypasses SDK to avoid 500s) |
 
 ### UI & Styling
@@ -265,7 +264,7 @@ Modern researchers face an overwhelming amount of scientific literature. Thousan
 ### Prerequisites
 - Node.js >= 18
 - npm >= 9
-- A Google AI Studio API key with access to Jessie
+- An API key with access to Jessie
 
 ### Setup Steps
 
@@ -283,7 +282,7 @@ Modern researchers face an overwhelming amount of scientific literature. Thousan
 3. **Configure your API key**
    Create a `.env` file in the project root:
    ```env
-   VITE_GEMINI_API_KEY=your_google_ai_studio_key_here
+   VITE_GEMINI_API_KEY=your_api_key_here
    ```
    The `.env` file is already in `.gitignore` — it will never be committed.
 
@@ -318,7 +317,7 @@ All tunable constants live in this file:
 
 | Constant | Default | Description |
 |----------|---------|-------------|
-| `GEMINI_API_KEY` | `import.meta.env.VITE_GEMINI_API_KEY` | API key from `.env` |
+| `GEMINI_API_KEY` | `import.meta.env.VITE_GEMINI_API_KEY` | API key |
 | `DEFAULT_TEMPERATURE` | `0.7` | Model temperature |
 | `DEFAULT_TOP_P` | `0.90` | Nucleus sampling |
 | `TOP_K` | `5` | Top-K memories to display in trace |
@@ -334,7 +333,7 @@ All tunable constants live in this file:
 ### File: `.env`
 
 ```env
-VITE_GEMINI_API_KEY=your_key_here
+VITE_GEMINI_API_KEY=your_key_here  # API key for our server
 ```
 
 ---
@@ -346,8 +345,8 @@ The entire AI pipeline lives in `src/utils/ai/gemini.ts` and is orchestrated by 
 ### Pipeline Steps
 
 #### Step 1: Embedding (Semantic Search)
-- User query is converted to a vector using `gemini-embedding-2-preview`
-- Done via `@google/genai` SDK (`embedText()` function)
+- User query is converted to a vector using the embedding model
+- Done via the AI SDK (`embedText()` function)
 
 #### Step 2: Memory Ranking
 - `rankMemories()` in `src/utils/pipeline/pipeline.ts` compares query vector against all stored memory vectors
@@ -361,13 +360,13 @@ The entire AI pipeline lives in `src/utils/ai/gemini.ts` and is orchestrated by 
 - No separate `MEMORY_BASE_INSTRUCTION` — the system role file is the single source of truth
 
 #### Step 4: Streaming Generation (Raw REST)
-- Uses raw `fetch()` + manual SSE parser (`createRawStream` / `sseGenerator`) — bypasses `@google/genai` SDK to avoid 500 errors
+- Uses raw `fetch()` + manual SSE parser (`createRawStream` / `sseGenerator`) — bypasses the AI SDK to avoid 500 errors
 - Model: `Jessie`
-- Endpoint: `POST https://generativelanguage.googleapis.com/v1beta/models/Jessie:streamGenerateContent?alt=sse`
-- Auth: `X-Goog-Api-Key` header
+- Endpoint: `POST /models/Jessie:streamGenerateContent?alt=sse` (relative to our server)
+- Auth: `Authorization: Bearer <key>` header
 - Thinking mode enabled: `generationConfig: { thinkingConfig: { thinkingLevel: "HIGH" } }`
-- Google Search grounding: enabled by default (`useSearchTool = true`), falls back automatically on 500
-- Tools field: sent as `tools: [{ googleSearch: {} }]` when search is enabled
+- Web search grounding: enabled by default (`useSearchTool = true`), falls back automatically on 500
+- Tools field: sent as `tools: [{ webSearch: {} }]` when search is enabled
 
 #### Step 5: Response Streaming
 - SSE chunks parsed via `sseGenerator`
@@ -391,17 +390,14 @@ The entire AI pipeline lives in `src/utils/ai/gemini.ts` and is orchestrated by 
 - **Temperature:** 0.7
 - **Top P:** 0.90
 - **Max Retries (streaming):** 3 attempts, 1500ms delay
-- **SDK Usage:** Only for embedding (`@google/genai`) and File API (PDF uploads)
+- **SDK Usage:** Only for embedding and File API (PDF uploads)
 - **REST Usage:** Main streaming generation
 
-### Key Architectural Decisions
-| Decision | Rationale |
-|----------|-----------|
-| Raw REST fetch instead of SDK for streaming | SDK request transformations caused server-side 500 errors |
-| `thinkingConfig` inside `generationConfig` | Top-level `thinkingConfig` returns 400 Bad Request |
-| `tools` field always present | Omitting it causes API to silently drop `thinkingConfig` |
-| PDFs via File API, not inlineData | `inlineData` for PDFs causes 500 on Jessie |
-| Retry delays: 1s+2s (inner), 1.5s (outer) | Minimized accumulated wait time |
+---
+
+## 11. Memory System
+
+### Data Structure (`MemoryRecord`)
 | Single unified streaming pipeline | No separate non-streaming path or decision API call |
 
 ---
@@ -484,13 +480,13 @@ This prevents 500 errors on subsequent messages.
 
 ## 13. API Integration Details
 
-### Google AI API Endpoints Used
+### API Endpoints Used
 
 | Endpoint | Method | Purpose | SDK vs REST |
 |----------|--------|---------|-------------|
-| `models/Jessie:streamGenerateContent?alt=sse` | POST | Main model streaming | Raw REST (`fetch`) |
-| `models/gemini-embedding-2-preview:embedContent` | POST | Query/memory embedding | `@google/genai` SDK |
-| File API (`/files/upload`, `/files/{name}`) | POST, GET | PDF upload + status polling | `@google/genai` SDK |
+| `/models/Jessie:streamGenerateContent?alt=sse` | POST | Main model streaming | Raw REST (`fetch`) |
+| Embedding API | POST | Query/memory embedding | AI SDK |
+| File API (`/files/upload`, `/files/{name}`) | POST, GET | PDF upload + status polling | AI SDK |
 
 ### Request Format (Streaming)
 
@@ -498,17 +494,17 @@ This prevents 500 errors on subsequent messages.
 {
   "contents": [{ "role": "user/model", "parts": [{ "text": "..." }] }],
   "systemInstruction": { "role": "system", "parts": [{ "text": "..." }] },
-  "tools": [{ "googleSearch": {} }],
+  "tools": [{ "webSearch": {} }],
   "generationConfig": { "thinkingConfig": { "thinkingLevel": "HIGH" } }
 }
 ```
 
 ### Key Headers
 - `Content-Type: application/json`
-- `X-Goog-Api-Key: <key from .env>`
+- `Authorization: Bearer <key from .env>`
 
 ### Fallback Behavior
-- Google Search grounding fails with 500 → automatically falls back to `useSearchTool = false` for remaining retries
+- Web search grounding fails with 500 → automatically falls back to `useSearchTool = false` for remaining retries
 - Streaming retries on: 500, 503, UNAVAILABLE, INTERNAL, RESOURCE_EXHAUSTED
 - Memory search failure → proceeds without memory context
 - PDF upload failure → skips that file, continues with others
@@ -566,3 +562,18 @@ All data is client-side only. No backend database or server is used.
 | Seed Data | Initial memory records | [../src/utils/ai/seedData.ts](../src/utils/ai/seedData.ts) |
 | Entry Point | React bootstrapping | [../src/main.tsx](../src/main.tsx) |
 | Root App | Landing page + chat routing | [../src/App.tsx](../src/App.tsx) |
+| Architecture | System architecture overview | [./architecture.md](./architecture.md) |
+| Component Tree | React component hierarchy | [./component_tree.md](./component_tree.md) |
+| API Integration | API endpoints and fallback behavior | [./api.md](./api.md) |
+| State Management | State locations and data flow | [./state_management.md](./state_management.md) |
+| Styling Guide | Design tokens, glassmorphism, animations | [./styling_guide.md](./styling_guide.md) |
+| Configuration | Environment variables and config constants | [./configuration.md](./configuration.md) |
+| Deployment | Build, preview, hosting instructions | [./deployment.md](./deployment.md) |
+| Testing | Testing strategy and recommendations | [./testing.md](./testing.md) |
+| Contributing | Code style, conventions, PR guidelines | [./contributing.md](./contributing.md) |
+| Security | API key safety, data privacy, best practices | [./security.md](./security.md) |
+| Performance | Current optimizations and recommendations | [./performance.md](./performance.md) |
+| Accessibility | Current state and improvement roadmap | [./accessibility.md](./accessibility.md) |
+| FAQ | Common questions about the platform | [./faq.md](./faq.md) |
+| Data Flow | Message send, memory, and selection flows | [./data_flow.md](./data_flow.md) |
+| Routing | Hash-based routing implementation | [./routing.md](./routing.md) |

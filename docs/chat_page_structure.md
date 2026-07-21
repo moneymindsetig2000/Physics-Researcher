@@ -62,7 +62,7 @@ Each message is rendered as a `.message-row` with a `data-message-id` attribute 
 - **User Messages (`.user-row`):**
   - Rendered inside `.user-message-wrapper`
   - Supports attached images (rendered in `.user-message-images-row`) — clickable for fullscreen preview
-  - Supports attached PDFs (rendered in `.user-message-files-row`) — clickable to download
+  - Supports attached PDFs (rendered in `.user-message-files-row`) — clickable for fullscreen preview
   - Text content rendered via `MarkdownRenderer`
   - **Message Actions (`.message-actions`, right-aligned):**
     - **Copy** — Copies the message text to clipboard (icon switches to checkmark on success)
@@ -98,6 +98,9 @@ Fixed at the bottom of the chat flow container with `position: absolute; bottom:
   - Support for attaching PDFs
   - Send button
   - Stop generation button (visible during AI response streaming)
+- **Tagged Text Pill:** When text is selected from an AI response and the "Ask AI" button is clicked, a glass pill appears above the input box showing the selected content. It has a remove (✕) button and a max-height of 80px with internal scrolling. It slides up from behind the input box on entry and slides back down on dismiss.
+  - The tagged text is prepended in quotes before the user's typed message when sent
+  - Animated with `motion/react` (GPU-accelerated transform/opacity only)
 
 ### Prompt Scrubber
 
@@ -122,6 +125,26 @@ A vertical navigation strip positioned at the **far right edge** of the workspac
 - `src/components/chatpage/chat/ui/UserPromptScrubber.tsx`
 - `src/components/chatpage/chat/ui/UserPromptScrubber.css`
 
+### AI Text Selection Toolbar
+
+When the user selects any text within an AI message, a floating toolbar appears just above the selection.
+
+**Visual Design:**
+- Fixed-position glassmorphism bar (`rgba(28, 28, 34, 0.94)`), `backdrop-filter: blur(24px) saturate(1.4)`, 10px border radius, thin 0.5px border
+- Contains a single "Ask AI" button with an info-circle SVG icon
+- Appears with a scale+fade animation (`0.15s`, Apple cubic-bezier)
+- Animates out when the user clicks elsewhere or dismisses by clicking the button
+
+**Interaction:**
+- Selecting text inside `.ai-message-ground` triggers the toolbar
+- The toolbar positions itself at the left edge of the selection, 10px above the top border
+- Clicking "Ask AI" clears the selection, hides the toolbar, and attaches the selected text as a tagged pill above the composer input
+- The `selectionchange` event handler is throttled via `requestAnimationFrame` to prevent layout thrashing during drag-selection
+
+**Implementation files:**
+- `src/components/chatpage/chat/ui/SelectionToolbar.tsx`
+- `src/components/chatpage/chat/ui/SelectionToolbar.css`
+
 ### Workspace Footer
 
 A thin footer bar (24px height) at the bottom showing the disclaimer:
@@ -133,6 +156,26 @@ Z-index: `3`
 ### Image Preview Modal
 
 When a user clicks an attached image, a fullscreen image preview modal is rendered via React portal to `document.body`. Clicking the overlay or the close button dismisses it.
+
+### PDF Preview Modal
+
+When a user clicks an attached PDF card (in a user message or in the right sidebar files tab), a fullscreen PDF preview modal opens instead of forcing a download.
+
+**Visual Design:**
+- Same overlay as the image preview modal (`rgba(5, 5, 8, 0.88)` backdrop)
+- Container (`960px` wide, `80vh` tall, 18px border radius, `#0c0c0e` background) with `contain: paint` for GPU efficiency
+- Dark header bar with PDF icon + filename label, close button, and download button
+- Download button matches the composer send button's liquid glass aesthetic
+
+**Interaction:**
+- PDF is displayed inline via an `<iframe>` with `contain: strict`
+- Download button triggers the same `handleDownloadPdf` utility (html2canvas + jsPDF) that the export action uses
+- Close button and overlay click both dismiss the modal
+- Entry animated with `previewZoomIn` (scale 0.95→1, fade 0→1)
+
+**Implementation:**
+- State: `previewPdf` in `ChatWorkspace.tsx`, passed down as `onPdfClick` to `MessageItem` and to `RightSidebar.tsx`
+- CSS: `.pdf-fullscreen-container`, `.pdf-fullscreen-header`, `.pdf-fullscreen-actions`, `.pdf-fullscreen-download-btn`, `.pdf-fullscreen-viewer` in `ChatWorkspace.css`
 
 ---
 
@@ -210,6 +253,8 @@ Located on the welcome state, the `PromptCardsGrid` displays physics research pr
 | `src/components/chatpage/chat/ui/MessageActions.css` | Message action styles |
 | `src/components/chatpage/chat/ui/ConversationDivider.tsx` | Thin separator between conversation rounds |
 | `src/components/chatpage/chat/ui/ConversationDivider.css` | Divider styles |
+| `src/components/chatpage/chat/ui/SelectionToolbar.tsx` | Floating toolbar on AI text selection |
+| `src/components/chatpage/chat/ui/SelectionToolbar.css` | Selection toolbar styles |
 | `src/components/chatpage/chat/ui/ArchitectureTraceBlock.tsx` | Pipeline diagnostics |
 | `src/components/chatpage/chat/ui/markdowns/MarkdownRenderer.tsx` | Markdown rendering |
 | `src/components/chatpage/sidebar/Sidebar.tsx` | Left sidebar |

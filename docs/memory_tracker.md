@@ -53,7 +53,7 @@ interface MemoryRecord {
 **Purpose:** Convert the user's query into a vector for semantic search.
 
 **Process:**
-1. User query is sent to the embedding model (`gemini-embedding-2-preview`)
+1. User query is sent to the embedding model
 2. Returns a vector (array of numbers) representing the query's meaning
 
 **Code Location:** `embedText()` function in `gemini.ts`
@@ -257,7 +257,7 @@ Memory 3: User prefers detailed explanations with equations.
 ### Problem (Before Fix)
 - The reranker made **1 API call PER memory**
 - With `CANDIDATE_POOL_SIZE = 10`, that's **10 sequential API calls**
-- Each call had ~44s latency (Google AI Studio)
+- Each call had ~44s latency
 - **Total: 10 × 44s = 440 seconds (7+ minutes)**
 
 ### Solution (After Fix)

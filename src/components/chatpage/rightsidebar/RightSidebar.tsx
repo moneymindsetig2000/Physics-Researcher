@@ -36,6 +36,7 @@ export function RightSidebar({
   const [newMemoryText, setNewMemoryText] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [previewPdf, setPreviewPdf] = useState<string | null>(null);
 
   const allImages = (chatMessages || []).flatMap(msg => msg.images || []);
   const allPdfs = (chatMessages || []).flatMap(msg => msg.pdfs || []);
@@ -220,7 +221,7 @@ export function RightSidebar({
                     <span className="files-section-label" style={allImages.length > 0 ? { marginTop: '1rem' } : {}}>Documents</span>
                     <div className="files-pdfs-list">
                       {allPdfs.map((pdf, idx) => (
-                        <div key={`pdf_${idx}`} className="files-pdf-item" onClick={() => handleDownloadPdf(pdf)} title="Click to download PDF">
+                        <div key={`pdf_${idx}`} className="files-pdf-item" onClick={() => setPreviewPdf(pdf)} title="Click to preview PDF">
                           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                             <polyline points="14 2 14 8 20 8"></polyline>
@@ -317,6 +318,52 @@ export function RightSidebar({
               </svg>
             </button>
             <img src={previewImage} alt="Fullscreen Preview" className="image-fullscreen-content" />
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {previewPdf && createPortal(
+        <div className="image-fullscreen-overlay" onClick={() => setPreviewPdf(null)}>
+          <div className="pdf-fullscreen-container" onClick={(e) => e.stopPropagation()}>
+            <div className="pdf-fullscreen-header">
+              <div className="pdf-fullscreen-title">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                </svg>
+                <span>PDF Preview</span>
+              </div>
+              <div className="pdf-fullscreen-actions">
+                <button
+                  className="pdf-fullscreen-download-btn"
+                  onClick={() => handleDownloadPdf(previewPdf)}
+                  title="Download PDF"
+                >
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                  Download
+                </button>
+                <button 
+                  className="image-fullscreen-close-btn" 
+                  onClick={() => setPreviewPdf(null)}
+                  aria-label="Close preview"
+                >
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <iframe
+              src={previewPdf}
+              className="pdf-fullscreen-viewer"
+              title="PDF Preview"
+            />
           </div>
         </div>,
         document.body

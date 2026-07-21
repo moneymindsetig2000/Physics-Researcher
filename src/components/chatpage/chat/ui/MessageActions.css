@@ -1,8 +1,8 @@
 .message-actions {
   display: flex;
   align-items: center;
-  gap: 1px;
-  margin-top: 8px;
+  gap: 4px;
+  margin-top: 10px;
   transform: translateZ(0);
 }
 
@@ -15,40 +15,87 @@
 }
 
 .action-btn {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   border: none;
-  border-radius: 6px;
+  border-radius: 7px;
   background: transparent;
-  color: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.32);
   cursor: pointer;
   transform: translateZ(0);
   transition:
-    color 0.2s cubic-bezier(0.16, 1, 0.3, 1),
-    background 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    color 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+    background 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   -webkit-tap-highlight-color: transparent;
+  will-change: transform;
 }
 
 .action-btn svg {
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .action-btn:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.65);
+  transform: translateZ(0) scale(1.12);
 }
 
 .action-btn:hover svg {
-  transform: scale(1.08);
+  transform: scale(1.06);
 }
 
 .action-btn:active {
-  transform: translateZ(0) scale(0.9);
+  transform: translateZ(0) scale(0.88);
+}
+
+.action-btn:active svg {
+  transform: scale(0.92);
 }
 
 .action-btn-active {
   color: rgba(255, 255, 255, 0.55);
+}
+
+.like-active {
+  color: #ff9f0a;
+}
+
+.like-active:hover {
+  color: #ffb340;
+  background: rgba(255, 159, 10, 0.1);
+}
+
+.like-active svg {
+  filter: drop-shadow(0 0 6px rgba(255, 159, 10, 0.25));
+}
+
+.dislike-active {
+  color: #ff6b6b;
+}
+
+.dislike-active:hover {
+  color: #ff8a8a;
+  background: rgba(255, 107, 107, 0.1);
+}
+
+.dislike-active svg {
+  filter: drop-shadow(0 0 6px rgba(255, 107, 107, 0.25));
+}
+
+.copy-active {
+  color: #34c759;
+}
+
+.copy-active:hover {
+  background: rgba(52, 199, 89, 0.1);
+}
+
+.pdf-btn:hover {
+  color: #5e9eff;
+  background: rgba(94, 158, 255, 0.08);
 }
