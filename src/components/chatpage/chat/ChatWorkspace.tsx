@@ -9,6 +9,8 @@ import { ArchitectureTraceBlock } from './ui/ArchitectureTraceBlock';
 import { MarkdownRenderer } from './ui/markdowns/MarkdownRenderer';
 import ThinkingLoader from './ui/ThinkingLoader';
 import { UserPromptScrubber } from './ui/UserPromptScrubber';
+import { ConversationDivider } from './ui/ConversationDivider';
+import { MessageActions } from './ui/MessageActions';
 import type { TraceRecord } from '../../../utils/ai/types';
 import './ChatWorkspace.css';
 
@@ -48,6 +50,7 @@ const MessageItem = React.memo(({
 }) => {
   const [isThinkingExpanded, setIsThinkingExpanded] = useState(false);
   const thinkingContentRef = useRef<HTMLDivElement>(null);
+  const aiContentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (thinkingContentRef.current) {
@@ -106,6 +109,7 @@ const MessageItem = React.memo(({
           <div className="user-message-box">
             <MarkdownRenderer content={msg.text} />
           </div>
+          <MessageActions text={msg.text} sender="user" />
         </div>
       ) : (
         <div className="ai-message-ground">
@@ -134,13 +138,14 @@ const MessageItem = React.memo(({
               <div ref={thinkingContentRef} className={`thinking-content ${isThinkingExpanded ? 'expanded' : 'collapsed'}`}>{msg.thought}</div>
             </motion.div>
           )}
-          {msg.text && <MarkdownRenderer content={msg.text} />}
+          {msg.text && <div ref={aiContentRef}><MarkdownRenderer content={msg.text} /></div>}
           {!msg.thought && !msg.text && (
             <div className="ai-message-loader">
               <ThinkingLoader />
             </div>
           )}
           {msg.trace && <ArchitectureTraceBlock trace={msg.trace} />}
+          {msg.text && <MessageActions text={msg.text} sender="ai" contentRef={aiContentRef} />}
         </div>
       )}
     </div>
@@ -209,13 +214,16 @@ export function ChatWorkspace({
 
         {activeChat && activeChat.messages.length > 0 ? (
           <div className="conversation-flow" id="conversation-flow-list" ref={conversationFlowRef}>
-            {activeChat.messages.map((msg) => (
-              <MessageItem 
-                key={msg.id} 
-                msg={msg} 
-                onImageClick={setPreviewImage}
-              />
-            ))}
+            {activeChat.messages.map((msg, idx) => {
+              const prev = idx > 0 ? activeChat.messages[idx - 1] : null;
+              const showDivider = prev && prev.sender === 'ai' && msg.sender === 'user';
+              return (
+                <React.Fragment key={msg.id}>
+                  {showDivider && <ConversationDivider />}
+                  <MessageItem msg={msg} onImageClick={setPreviewImage} />
+                </React.Fragment>
+              );
+            })}
           </div>
         ) : (
           <WelcomeState onSelectPrompt={(text) => onSendPrompt(text, [])} />

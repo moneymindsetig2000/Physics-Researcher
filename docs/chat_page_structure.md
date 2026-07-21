@@ -64,6 +64,9 @@ Each message is rendered as a `.message-row` with a `data-message-id` attribute 
   - Supports attached images (rendered in `.user-message-images-row`) — clickable for fullscreen preview
   - Supports attached PDFs (rendered in `.user-message-files-row`) — clickable to download
   - Text content rendered via `MarkdownRenderer`
+  - **Message Actions (`.message-actions`, right-aligned):**
+    - **Copy** — Copies the message text to clipboard (icon switches to checkmark on success)
+    - **Edit** — Pencil icon for editing the message
 
 - **AI Messages (`.ai-row`):**
   - Rendered inside `.ai-message-ground`
@@ -74,6 +77,12 @@ Each message is rendered as a `.message-row` with a `data-message-id` attribute 
   - Main text content rendered via `MarkdownRenderer`
   - Fallback `ThinkingLoader` shown when neither text nor thought exists
   - **Architecture Trace Block:** If a `trace` record is present, it is rendered at the bottom of the AI message
+  - **Message Actions (`.message-actions`, left-aligned):**
+    - **Copy** — Copies the message text to clipboard
+    - **Like** — Thumbs up toggle (filled when active)
+    - **Dislike** — Thumbs down toggle (filled when active)
+    - **Export PDF** — Generates an A4 PDF of the AI message using html2canvas + jsPDF, preserving markdown formatting and KaTeX equations with consistent 18mm margins on every page
+  - All action icons are pure SVGs with smooth CSS transitions (color, background, scale) and a 0.9× squash on click
 
 #### Blur Overlays
 
@@ -197,9 +206,14 @@ Located on the welcome state, the `PromptCardsGrid` displays physics research pr
 | `src/components/chatpage/chat/ui/ThinkingLoader.tsx` | Loading indicator |
 | `src/components/chatpage/chat/ui/UserPromptScrubber.tsx` | Prompt navigation scrubber |
 | `src/components/chatpage/chat/ui/UserPromptScrubber.css` | Scrubber styles |
+| `src/components/chatpage/chat/ui/MessageActions.tsx` | Copy, edit, like, dislike buttons |
+| `src/components/chatpage/chat/ui/MessageActions.css` | Message action styles |
+| `src/components/chatpage/chat/ui/ConversationDivider.tsx` | Thin separator between conversation rounds |
+| `src/components/chatpage/chat/ui/ConversationDivider.css` | Divider styles |
 | `src/components/chatpage/chat/ui/ArchitectureTraceBlock.tsx` | Pipeline diagnostics |
 | `src/components/chatpage/chat/ui/markdowns/MarkdownRenderer.tsx` | Markdown rendering |
 | `src/components/chatpage/sidebar/Sidebar.tsx` | Left sidebar |
 | `src/components/chatpage/sidebar/Sidebar.css` | Sidebar styles |
 | `src/components/chatpage/sidebar/options/DashboardConfirmationModal.tsx` | Dashboard confirmation modal |
 | `src/components/chatpage/sidebar/options/DashboardConfirmationModal.css` | Modal styles |
+| `src/utils/pdf/exportPdf.ts` | PDF export utility — renders AI messages to A4 PDF via html2canvas + jsPDF |

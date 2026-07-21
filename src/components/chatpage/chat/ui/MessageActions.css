@@ -1,0 +1,54 @@
+.message-actions {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  margin-top: 8px;
+  transform: translateZ(0);
+}
+
+.user-actions {
+  justify-content: flex-end;
+}
+
+.ai-actions {
+  justify-content: flex-start;
+}
+
+.action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+  transform: translateZ(0);
+  transition:
+    color 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+    background 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.action-btn svg {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.action-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.action-btn:hover svg {
+  transform: scale(1.08);
+}
+
+.action-btn:active {
+  transform: translateZ(0) scale(0.9);
+}
+
+.action-btn-active {
+  color: rgba(255, 255, 255, 0.55);
+}
