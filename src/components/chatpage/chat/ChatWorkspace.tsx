@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { createPortal } from 'react-dom';
 import { WorkspaceHeader } from './ui/WorkspaceHeader';
@@ -12,6 +12,7 @@ import { UserPromptScrubber } from './ui/UserPromptScrubber';
 import { ConversationDivider } from './ui/ConversationDivider';
 import { MessageActions } from './ui/MessageActions';
 import { SelectionToolbar } from './ui/SelectionToolbar';
+import { SummaryPopup } from './ui/SummaryPopup';
 import type { TraceRecord } from '../../../utils/ai/types';
 import './ChatWorkspace.css';
 
@@ -29,6 +30,7 @@ interface Chat {
   id: string;
   name: string;
   messages: Message[];
+  summary?: string | null;
 }
 
 interface ChatWorkspaceProps {
@@ -40,39 +42,130 @@ interface ChatWorkspaceProps {
   onSendPrompt: (promptText: string, attachedImages?: string[], attachedPdfs?: string[]) => void;
   isGenerating?: boolean;
   onStopGeneration?: () => void;
+  summary?: string | null;
+  isSummaryGenerating?: boolean;
 }
+
+const TYPEWRITER_SPEED = 4;
 
 const MessageItem = React.memo(({ 
   msg,
   onImageClick,
-  onPdfClick
+  onPdfClick,
+  isGenerating
 }: { 
   msg: Message;
   onImageClick?: (url: string) => void;
   onPdfClick?: (url: string) => void;
+  isGenerating?: boolean;
 }) => {
   const [isThinkingExpanded, setIsThinkingExpanded] = useState(false);
+  const [displayedText, setDisplayedText] = useState('');
+  const [displayedThought, setDisplayedThought] = useState('');
+  const indexTextRef = useRef(0);
+  const indexThoughtRef = useRef(0);
+  const bufferTextRef = useRef(msg.text);
+  const bufferThoughtRef = useRef(msg.thought || '');
+  const generatingRef = useRef(isGenerating);
+  const rafRef = useRef<number | null>(null);
   const thinkingContentRef = useRef<HTMLDivElement>(null);
   const aiContentRef = useRef<HTMLDivElement>(null);
 
+  generatingRef.current = isGenerating;
+  bufferTextRef.current = msg.text;
+  bufferThoughtRef.current = msg.thought || '';
+
+  // Scroll thinking content when displayed thought grows
   useEffect(() => {
     if (thinkingContentRef.current) {
-      thinkingContentRef.current.scrollTo({ top: thinkingContentRef.current.scrollHeight, behavior: 'smooth' });
+      const el = thinkingContentRef.current;
+      el.scrollTop = el.scrollHeight;
     }
-  }, [msg.thought]);
+  }, [displayedThought]);
 
-  const handleDownloadPdf = (pdfDataUrl: string) => {
-    try {
-      const link = document.createElement('a');
-      link.href = pdfDataUrl;
-      link.download = 'document.pdf';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    } catch (e) {
-      console.error("PDF download failed", e);
+  useEffect(() => {
+    if (aiContentRef.current) {
+      const parent = aiContentRef.current.closest('.conversation-flow') as HTMLElement | null;
+      if (parent) {
+        parent.scrollTop = parent.scrollHeight;
+      }
     }
-  };
+  }, [displayedText]);
+
+  const scrollToBottom = useCallback(() => {
+    if (aiContentRef.current) {
+      const parent = aiContentRef.current.closest('.conversation-flow') as HTMLElement | null;
+      if (parent) {
+        parent.scrollTop = parent.scrollHeight;
+      }
+    }
+  }, []);
+
+  // Typewriter RAF loop
+  useEffect(() => {
+    if (!generatingRef.current) {
+      indexTextRef.current = bufferTextRef.current.length;
+      indexThoughtRef.current = bufferThoughtRef.current.length;
+      setDisplayedText(bufferTextRef.current);
+      setDisplayedThought(bufferThoughtRef.current);
+      return;
+    }
+
+    indexTextRef.current = 0;
+    indexThoughtRef.current = 0;
+    setDisplayedText('');
+    setDisplayedThought('');
+
+    const tick = () => {
+      const textDone = indexTextRef.current >= bufferTextRef.current.length;
+      const thoughtDone = indexThoughtRef.current >= bufferThoughtRef.current.length;
+
+      if (!generatingRef.current && textDone && thoughtDone) {
+        rafRef.current = null;
+        return;
+      }
+
+      if (!generatingRef.current) {
+        setDisplayedText(bufferTextRef.current);
+        setDisplayedThought(bufferThoughtRef.current);
+        indexTextRef.current = bufferTextRef.current.length;
+        indexThoughtRef.current = bufferThoughtRef.current.length;
+        rafRef.current = requestAnimationFrame(tick);
+        return;
+      }
+
+      if (!textDone) {
+        indexTextRef.current = Math.min(indexTextRef.current + TYPEWRITER_SPEED, bufferTextRef.current.length);
+        setDisplayedText(bufferTextRef.current.slice(0, indexTextRef.current));
+      }
+
+      if (!thoughtDone) {
+        indexThoughtRef.current = Math.min(indexThoughtRef.current + TYPEWRITER_SPEED + 1, bufferThoughtRef.current.length);
+        setDisplayedThought(bufferThoughtRef.current.slice(0, indexThoughtRef.current));
+      }
+
+      rafRef.current = requestAnimationFrame(tick);
+    };
+
+    rafRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+    };
+  }, [msg.id]);
+
+  // When generating stops, reveal remaining text in one smooth step
+  useEffect(() => {
+    if (!isGenerating) {
+      indexTextRef.current = bufferTextRef.current.length;
+      indexThoughtRef.current = bufferThoughtRef.current.length;
+      setDisplayedText(bufferTextRef.current);
+      setDisplayedThought(bufferThoughtRef.current);
+      scrollToBottom();
+    }
+  }, [isGenerating, scrollToBottom]);
+
+  const typewriterDone = displayedText.length >= (msg.text?.length || 0) &&
+    displayedThought.length >= ((msg.thought || '').length || 0);
 
   return (
     <div className={`message-row ${msg.sender === 'user' ? 'user-row' : 'ai-row'}`} data-message-id={msg.id}>
@@ -116,7 +209,7 @@ const MessageItem = React.memo(({
         </div>
       ) : (
         <div className="ai-message-ground">
-          {msg.thought && (
+          {bufferThoughtRef.current && (
             <motion.div
               initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: 1, y: 0 }}
@@ -138,17 +231,17 @@ const MessageItem = React.memo(({
                   </svg>
                 </button>
               </div>
-              <div ref={thinkingContentRef} className={`thinking-content ${isThinkingExpanded ? 'expanded' : 'collapsed'}`}>{msg.thought}</div>
+              <div ref={thinkingContentRef} className={`thinking-content ${isThinkingExpanded ? 'expanded' : 'collapsed'}`}>{displayedThought}</div>
             </motion.div>
           )}
-          {msg.text && <div ref={aiContentRef}><MarkdownRenderer content={msg.text} /></div>}
-          {!msg.thought && !msg.text && (
+          {displayedText && <div ref={aiContentRef}><MarkdownRenderer content={displayedText} /></div>}
+          {!bufferThoughtRef.current && !bufferTextRef.current && (
             <div className="ai-message-loader">
               <ThinkingLoader />
             </div>
           )}
           {msg.trace && <ArchitectureTraceBlock trace={msg.trace} />}
-          {msg.text && <MessageActions text={msg.text} sender="ai" contentRef={aiContentRef} />}
+          {typewriterDone && !isGenerating && displayedText && <MessageActions text={msg.text} sender="ai" contentRef={aiContentRef} />}
         </div>
       )}
     </div>
@@ -159,6 +252,7 @@ const MessageItem = React.memo(({
     prevProps.msg.text === nextProps.msg.text &&
     prevProps.msg.thought === nextProps.msg.thought &&
     prevProps.msg.trace === nextProps.msg.trace &&
+    prevProps.isGenerating === nextProps.isGenerating &&
     (prevProps.msg.images === nextProps.msg.images || 
       (Array.isArray(prevProps.msg.images) && Array.isArray(nextProps.msg.images) && 
        prevProps.msg.images.length === nextProps.msg.images.length &&
@@ -178,7 +272,9 @@ export function ChatWorkspace({
   activeChat,
   onSendPrompt,
   isGenerating,
-  onStopGeneration
+  onStopGeneration,
+  summary,
+  isSummaryGenerating
 }: ChatWorkspaceProps) {
   const [message, setMessage] = useState('');
   const [previewImage, setPreviewImage] = useState<string | null>(null);
@@ -187,10 +283,12 @@ export function ChatWorkspace({
   const [showTaggedPill, setShowTaggedPill] = useState(false);
   const [selectionState, setSelectionState] = useState<{
     text: string;
-    position: { top: number; left: number; width: number } | null;
+    position: { top: number; left: number } | null;
   } | null>(null);
+  const [showSummaryPopup, setShowSummaryPopup] = useState(false);
   const conversationFlowRef = useRef<HTMLDivElement>(null);
   const hasActiveSelectionRef = useRef(false);
+  const mouseUpPosRef = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     if (taggedText) setShowTaggedPill(true);
@@ -216,7 +314,7 @@ export function ChatWorkspace({
       let el: Element | null = node?.nodeType === 3 ? node.parentElement : node as Element;
 
       while (el) {
-        if (el.classList?.contains('ai-message-ground')) return sel;
+        if (el.classList?.contains('ai-message-ground') || el.classList?.contains('user-message-box')) return sel;
         el = el.parentElement;
       }
       return null;
@@ -224,7 +322,8 @@ export function ChatWorkspace({
 
     let rafId: number | null = null;
 
-    const handleSelection = () => {
+    const handleMouseUp = (e: MouseEvent) => {
+      mouseUpPosRef.current = { x: e.clientX, y: e.clientY };
       if (rafId !== null) return;
       rafId = requestAnimationFrame(() => {
         rafId = null;
@@ -237,22 +336,20 @@ export function ChatWorkspace({
           return;
         }
         hasActiveSelectionRef.current = true;
-        const range = sel.getRangeAt(0);
-        const rect = range.getBoundingClientRect();
+        const mousePos = mouseUpPosRef.current;
+        const pos = mousePos
+          ? { top: mousePos.y - 40, left: Math.max(12, mousePos.x) }
+          : { top: 0, left: 12 };
         setSelectionState({
           text: sel.toString().trim(),
-          position: {
-            top: rect.top,
-            left: Math.max(12, rect.left),
-            width: rect.width,
-          },
+          position: pos,
         });
       });
     };
 
-    document.addEventListener('selectionchange', handleSelection);
+    document.addEventListener('mouseup', handleMouseUp);
     return () => {
-      document.removeEventListener('selectionchange', handleSelection);
+      document.removeEventListener('mouseup', handleMouseUp);
       if (rafId !== null) cancelAnimationFrame(rafId);
     };
   }, []);
@@ -297,6 +394,9 @@ export function ChatWorkspace({
         onToggleRightSidebar={onToggleRightSidebar}
         isLeftSidebarCollapsed={isLeftSidebarCollapsed}
         onToggleLeftSidebar={onToggleLeftSidebar}
+        onSummaryClick={() => setShowSummaryPopup(true)}
+        hasMessages={!!activeChat && activeChat.messages.length > 0}
+        isSummaryGenerating={isSummaryGenerating}
       />
 
       {/* Main Chat Flow Area (centered welcome state or message thread) */}
@@ -312,7 +412,7 @@ export function ChatWorkspace({
               return (
                 <React.Fragment key={msg.id}>
                   {showDivider && <ConversationDivider />}
-                  <MessageItem msg={msg} onImageClick={setPreviewImage} onPdfClick={setPreviewPdf} />
+                  <MessageItem msg={msg} onImageClick={setPreviewImage} onPdfClick={setPreviewPdf} isGenerating={isGenerating} />
                 </React.Fragment>
               );
             })}
@@ -373,7 +473,13 @@ export function ChatWorkspace({
 
       {activeChat && activeChat.messages.length > 0 && (
         <UserPromptScrubber 
-          messages={activeChat.messages.filter(m => m.sender === 'user').map(m => ({ id: m.id, text: m.text }))}
+          messages={activeChat.messages.reduce<{ id: string; text: string; aiId?: string }[]>((acc, m, i, arr) => {
+            if (m.sender === 'user') {
+              const next = arr[i + 1];
+              acc.push({ id: m.id, text: m.text, aiId: next?.sender === 'ai' ? next.id : undefined });
+            }
+            return acc;
+          }, [])}
           containerRef={conversationFlowRef}
         />
       )}
@@ -447,6 +553,13 @@ export function ChatWorkspace({
         </div>,
         document.body
       )}
+
+      {/* Research Summary Popup */}
+      <SummaryPopup
+        summary={summary ?? null}
+        isOpen={showSummaryPopup}
+        onClose={() => setShowSummaryPopup(false)}
+      />
     </div>
   );
 }

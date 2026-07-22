@@ -35,12 +35,14 @@
 
 .workspace-title {
   font-family: var(--font-sans);
-  font-size: 1.1rem;
+  font-size: 1.3rem;
   font-weight: 600;
   color: #ffffff;
   margin: 0;
   line-height: 1.25;
 }
+
+
 
 .workspace-desc {
   font-family: var(--font-sans);
@@ -360,7 +362,7 @@
 }
 
 .composer-container.has-tagged .chat-input-capsule:focus-within {
-  border-color: rgba(139, 92, 246, 0.4);
+  border-color: rgba(255, 255, 255, 0.25);
   border-top: none;
 }
 
@@ -441,11 +443,11 @@
 
 .chat-input-capsule:focus-within {
   background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(139, 92, 246, 0.4);
+  border-color: rgba(255, 255, 255, 0.25);
   box-shadow:
     inset 0 1px 2px rgba(255, 255, 255, 0.15),
     0 15px 35px rgba(0, 0, 0, 0.5),
-    0 0 15px rgba(139, 92, 246, 0.15);
+    0 0 15px rgba(255, 255, 255, 0.08);
 }
 
 .composer-textarea {
@@ -723,11 +725,9 @@
   margin: 0 auto;
   scrollbar-width: thin;
   scroll-behavior: smooth;
-
-  /* GPU Layer Acceleration for butter-smooth scroll performance */
-  will-change: transform;
+  overscroll-behavior: none;
   transform: translate3d(0, 0, 0);
-  contain: content;
+  contain: paint layout;
 }
 
 .conversation-flow::-webkit-scrollbar {
@@ -747,7 +747,6 @@
   display: flex;
   width: 100%;
   transform: translate3d(0, 0, 0);
-  will-change: transform;
   contain: layout paint;
 }
 
@@ -811,6 +810,15 @@
 
 .ai-message-ground .message-text {
   margin: 0;
+}
+
+@keyframes typewriter-fade {
+  from {
+    opacity: 0.92;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 /* Modern thinking box */

@@ -1,6 +1,6 @@
 .scrubber-track {
   position: absolute;
-  right: 0;
+  right: 7px;
   top: 80px;
   bottom: 24px;
   width: 28px;
@@ -36,45 +36,51 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
   pointer-events: auto;
   flex-shrink: 0;
 }
 
 .scrubber-dot {
-  width: 20px;
+  width: 28px;
   height: 5px;
   border-radius: 3px;
   background: #ffffff;
   cursor: pointer;
   flex-shrink: 0;
-  transition: opacity 0.15s ease;
-  opacity: 0.7;
+  transition: opacity 0.15s ease, box-shadow 0.15s ease;
+  opacity: 0.35;
 }
 
 .scrubber-dot:hover {
   opacity: 1;
 }
 
+.scrubber-dot.active {
+  opacity: 1;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.6), 0 0 20px rgba(255, 255, 255, 0.2);
+}
+
 .scrubber-popup {
   position: absolute;
-  right: calc(100% + 14px);
+  right: 0;
   top: 50%;
   translate: 0 -50%;
+  z-index: 11;
   transform-origin: right center;
-  background: rgba(22, 22, 26, 0.85);
-  backdrop-filter: blur(24px) saturate(1.4);
-  -webkit-backdrop-filter: blur(24px) saturate(1.4);
-  border: 0.5px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
-  padding: 0.2rem 0;
-  min-width: 200px;
-  max-width: 320px;
+  background: rgba(18, 18, 22, 0.92);
+  backdrop-filter: blur(32px) saturate(1.3);
+  -webkit-backdrop-filter: blur(32px) saturate(1.3);
+  border: 0.5px solid rgba(255, 255, 255, 0.07);
+  border-radius: 12px;
+  padding: 0.3rem 0;
+  min-width: 250px;
+  max-width: 400px;
   pointer-events: auto;
   box-shadow:
-    0 12px 40px rgba(0, 0, 0, 0.6),
-    0 0 0 0.5px rgba(255, 255, 255, 0.04),
-    inset 0 0.5px 0 rgba(255, 255, 255, 0.08);
+    0 20px 60px rgba(0, 0, 0, 0.7),
+    0 0 0 0.5px rgba(255, 255, 255, 0.03),
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.06);
   max-height: min(360px, 60vh);
 }
 
@@ -82,11 +88,11 @@
   max-height: inherit;
   overflow-y: auto;
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
 }
 
 .scrubber-popup-inner::-webkit-scrollbar {
-  width: 4px;
+  width: 3px;
 }
 
 .scrubber-popup-inner::-webkit-scrollbar-track {
@@ -94,34 +100,53 @@
 }
 
 .scrubber-popup-inner::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.1);
   border-radius: 2px;
 }
 
 .scrubber-popup-item {
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', system-ui, sans-serif;
   font-size: 0.8125rem;
-  font-weight: 400;
-  color: rgba(255, 255, 255, 0.88);
-  line-height: 1.35;
-  padding: 0.45rem 0.75rem;
+  font-weight: 450;
+  color: rgba(255, 255, 255, 0.75);
+  line-height: 1.45;
+  padding: 0.55rem 0.9rem;
   cursor: pointer;
-  transition: background 0.12s ease;
+  transition: background 0.15s ease, color 0.15s ease;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  position: relative;
 }
 
 .scrubber-popup-item:first-child {
-  border-top-left-radius: 10px;
-  border-top-right-radius: 10px;
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
 }
 
 .scrubber-popup-item:last-child {
-  border-bottom-left-radius: 10px;
-  border-bottom-right-radius: 10px;
+  border-bottom-left-radius: 12px;
+  border-bottom-right-radius: 12px;
 }
 
 .scrubber-popup-item:hover {
-  background: rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.scrubber-popup-item.active {
+  color: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.scrubber-popup-item.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 20%;
+  bottom: 20%;
+  width: 2px;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 1px;
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.3);
 }

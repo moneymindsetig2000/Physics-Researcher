@@ -27,27 +27,8 @@
     │
     ├── Chat Workspace
     │   ├── WorkspaceHeader
-    │   ├── ChatFlowContainer
-    │   │   ├── WelcomeState
-    │   │   │   └── PromptCardsGrid
-    │   │   │
-    │   │   └── ConversationFlow
-    │   │       ├── MessageItem (user)
-    │   │       │   ├── UserMessageWrapper
-    │   │       │   │   ├── UserMessageImagesRow
-    │   │       │   │   └── UserMessageFilesRow
-    │   │       │   ├── MarkdownRenderer
-    │   │       │   └── MessageActions (copy, edit)
-    │   │       │
-    │   │       ├── MessageItem (AI)
-    │   │       │   ├── AiMessageGround
-    │   │       │   │   ├── ThinkingBox (expandable)
-    │   │       │   │   ├── MarkdownRenderer
-    │   │       │   │   ├── ArchitectureTraceBlock
-    │   │       │   │   └── MessageActions (copy, like, dislike, export PDF)
-    │   │       │   └── ConversationDivider
-    │   │       │
-    │   │       └── ThinkingLoader
+    │   │
+    │   ├── SummaryPopup (modal)
     │   │
     │   ├── BlurOverlays (top + bottom)
     │   │
@@ -70,4 +51,6 @@
     │   └── FileBrowserTab
     │
     └── Settings Panel
+
+    └── NewChatDialog (modal, portal)
 ```

@@ -245,7 +245,7 @@ export function ComposerInput({
             </div>
           ))}
 
-          {attachedPdfs.map((pdf, idx) => (
+          {attachedPdfs.map((_pdf, idx) => (
             <div key={'pdf_' + idx} className="composer-file-capsule">
               <div className="composer-file-icon">
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

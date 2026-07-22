@@ -3,7 +3,7 @@ import './SelectionToolbar.css';
 
 interface SelectionToolbarProps {
   selectedText: string;
-  position: { top: number; left: number; width: number } | null;
+  position: { top: number; left: number } | null;
   onAskAi: (text: string) => void;
   onDismiss: () => void;
 }
@@ -23,14 +23,12 @@ export function SelectionToolbar({ selectedText, position, onAskAi, onDismiss }:
 
   if (!position) return null;
 
-  const toolbarTop = position.top - 10;
-
   return (
     <div
       ref={toolbarRef}
       className="selection-toolbar"
       style={{
-        top: `${toolbarTop}px`,
+        top: `${position.top}px`,
         left: `${position.left}px`,
       }}
     >

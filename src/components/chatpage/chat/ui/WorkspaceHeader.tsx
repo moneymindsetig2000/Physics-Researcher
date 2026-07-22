@@ -3,13 +3,19 @@ interface WorkspaceHeaderProps {
   onToggleRightSidebar: () => void;
   isLeftSidebarCollapsed: boolean;
   onToggleLeftSidebar: () => void;
+  onSummaryClick?: () => void;
+  hasMessages?: boolean;
+  isSummaryGenerating?: boolean;
 }
 
 export function WorkspaceHeader({ 
   isRightSidebarCollapsed, 
   onToggleRightSidebar,
   isLeftSidebarCollapsed,
-  onToggleLeftSidebar
+  onToggleLeftSidebar,
+  onSummaryClick,
+  hasMessages,
+  isSummaryGenerating
 }: WorkspaceHeaderProps) {
   return (
     <header className="workspace-header" id="chat-header">
@@ -46,27 +52,36 @@ export function WorkspaceHeader({
           </button>
         )}
         <div className="header-text-group">
-          <h1 className="workspace-title">Chat with Gemma 4 31B</h1>
+          <h1 className="workspace-title">Jessie</h1>
           <p className="workspace-desc">A specialized companion for physics paper discovery, literature review, and equation understanding.</p>
         </div>
       </div>
       <div className="header-actions">
-        {/* GitHub Icon */}
-        <button className="icon-btn" id="btn-github" aria-label="GitHub Repository">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4" />
-            <path d="M9 18c-4.51 2-5-2-7-2" />
-          </svg>
-          <span className="tooltip">Visit repository source code and academic integration configs.</span>
-        </button>
-        {/* Panels Icon */}
-        <button className="icon-btn" id="btn-panels" aria-label="Toggle Panels">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2">
-            <rect x="3" y="3" width="18" height="18" rx="2" />
-            <line x1="9" y1="3" x2="9" y2="21" />
-            <line x1="15" y1="3" x2="15" y2="21" />
-          </svg>
-          <span className="tooltip">Configure workspace window splits and panel layouts.</span>
+        {/* Research Summary Button */}
+        <button 
+          className="icon-btn" 
+          id="btn-summary" 
+          aria-label="Research Summary"
+          onClick={onSummaryClick}
+          style={{ opacity: (hasMessages && !isSummaryGenerating) ? 1 : (isSummaryGenerating ? 1 : 0.3), pointerEvents: hasMessages ? 'auto' : 'none' }}
+        >
+          {isSummaryGenerating ? (
+            <svg className="summary-spinner" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" strokeDasharray="50" strokeDashoffset="50">
+                <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="0.8s" repeatCount="indefinite" />
+                <animate attributeName="stroke-dashoffset" values="50;0;50" dur="1.2s" repeatCount="indefinite" />
+              </circle>
+            </svg>
+          ) : (
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+              <line x1="16" y1="13" x2="8" y2="13" />
+              <line x1="16" y1="17" x2="8" y2="17" />
+              <polyline points="10 9 9 9 8 9" />
+            </svg>
+          )}
+          <span className="tooltip">{isSummaryGenerating ? 'Generating research summary...' : 'View research session summary and progress.'}</span>
         </button>
         {/* Right Sidebar Collapse/Expand Button */}
         {isRightSidebarCollapsed && (

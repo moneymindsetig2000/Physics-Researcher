@@ -33,7 +33,7 @@ export function isApiKeyConfigured(): boolean {
 /**
  * Executes an asynchronous Gemini API task with exponential backoff retry on 500 and 503 errors.
  */
-async function callWithRetry<T>(fn: () => Promise<T>, retries = 4, delay = 1500, signal?: AbortSignal): Promise<T> {
+export async function callWithRetry<T>(fn: () => Promise<T>, retries = 4, delay = 1500, signal?: AbortSignal): Promise<T> {
   if (signal?.aborted) {
     throw new DOMException("The user aborted a request.", "AbortError");
   }

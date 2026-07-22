@@ -5,6 +5,8 @@ import { RightSidebar } from './rightsidebar/RightSidebar';
 import type { MemoryRecord, TraceRecord } from '../../utils/ai/types';
 import { runQueryPipelineStream, embedText } from '../../utils/ai/gemini';
 import { getInitialSeedMemories } from '../../utils/ai/seedData';
+import { generateSummary } from '../../utils/ai/summaryGenerator';
+import { NewChatDialog } from './chat/ui/NewChatDialog';
 import './ChatPage.css';
 
 interface Message {
@@ -22,6 +24,7 @@ interface Chat {
   name: string;
   messages: Message[];
   isPinned?: boolean;
+  summary?: string | null;
 }
 
 export function ChatPage() {
@@ -72,6 +75,9 @@ export function ChatPage() {
   const embeddingProcessedRef = useRef(false);
 
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSummaryGenerating, setIsSummaryGenerating] = useState(false);
+  const [showNewChatDialog, setShowNewChatDialog] = useState(false);
+  const pendingContextSummaryRef = useRef<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const handleStopGeneration = useCallback(() => {
@@ -146,6 +152,24 @@ export function ChatPage() {
   }, [memories.length]); // depend only on COUNT — fires on initial load only, not on content update
 
   const handleNewChat = useCallback(() => {
+    const activeChat = chats.find(c => c.id === activeChatId);
+    if (activeChat && activeChat.messages.length > 0) {
+      setShowNewChatDialog(true);
+    } else {
+      setActiveChatId(null);
+    }
+  }, [chats, activeChatId]);
+
+  const handleContinueWithContext = useCallback(() => {
+    const activeChat = chats.find(c => c.id === activeChatId);
+    pendingContextSummaryRef.current = activeChat?.summary ?? null;
+    setShowNewChatDialog(false);
+    setActiveChatId(null);
+  }, [chats, activeChatId]);
+
+  const handleFreshStart = useCallback(() => {
+    pendingContextSummaryRef.current = null;
+    setShowNewChatDialog(false);
     setActiveChatId(null);
   }, []);
   const handleSendPrompt = useCallback(async (
@@ -157,6 +181,7 @@ export function ChatPage() {
 
     // Extract past conversation history before state update
     const activeChat = chats.find(c => c.id === activeChatId);
+    const existingSummary = activeChat?.summary ?? null;
     const historyMessages = activeChat ? activeChat.messages : [];
     const chatHistory = historyMessages.map(msg => ({
       sender: msg.sender,
@@ -181,6 +206,12 @@ export function ChatPage() {
 
     let currentChatId = activeChatId;
     if (currentChatId === null) {
+      const contextSummary = pendingContextSummaryRef.current;
+      pendingContextSummaryRef.current = null;
+      const firstPrompt = contextSummary
+        ? `[Previous Research Context]\n${contextSummary}\n\n---\n\n${promptText}`
+        : promptText;
+      userMessage.text = firstPrompt;
       currentChatId = 'chat_' + Date.now();
       const chatName = promptText.length > 35 ? promptText.slice(0, 35) + '...' : promptText;
       const newChat: Chat = {
@@ -220,7 +251,7 @@ export function ChatPage() {
 
       // Execute the end-to-end reasoning pipeline with streaming, passing conversation history context and image/document payloads
       const result = await runQueryPipelineStream(
-        promptText,
+        userMessage.text,
         memories,
         (chunk) => {
           setChats(prev => prev.map(chat => {
@@ -280,6 +311,27 @@ export function ChatPage() {
         activeMemories = [...activeMemories, result.newMemoryCreated];
         setMemories(activeMemories);
         localStorage.setItem('physica_ai_memories', JSON.stringify(activeMemories));
+      }
+
+      // Fire-and-forget summary generation — merges the newest exchange into the existing summary
+      if (currentChatId) {
+        const newExchange = [
+          { sender: 'user' as const, text: promptText },
+          { sender: 'ai' as const, text: result.replyText }
+        ];
+        setIsSummaryGenerating(true);
+        generateSummary(newExchange, undefined, existingSummary).then(summary => {
+          if (summary) {
+            setChats(prev => prev.map(chat => {
+              if (chat.id === currentChatId) {
+                return { ...chat, summary };
+              }
+              return chat;
+            }));
+          }
+        }).catch(() => {}).finally(() => {
+          setIsSummaryGenerating(false);
+        });
       }
     } catch (err: any) {
       if (err.name === 'AbortError' || err.message?.includes('aborted') || err.message?.includes('AbortError')) {
@@ -415,6 +467,8 @@ export function ChatPage() {
         onSendPrompt={handleSendPrompt}
         isGenerating={isGenerating}
         onStopGeneration={handleStopGeneration}
+        summary={activeChat?.summary}
+        isSummaryGenerating={isSummaryGenerating}
       />
       <RightSidebar 
         isCollapsed={isRightSidebarCollapsed} 
@@ -422,6 +476,14 @@ export function ChatPage() {
         memories={memories}
         onUpdateMemories={handleUpdateMemories}
         chatMessages={activeChat?.messages || []}
+      />
+
+      {/* New Chat Dialog */}
+      <NewChatDialog
+        isOpen={showNewChatDialog}
+        onContinueWithContext={handleContinueWithContext}
+        onFreshStart={handleFreshStart}
+        onDismiss={() => setShowNewChatDialog(false)}
       />
     </div>
   );
