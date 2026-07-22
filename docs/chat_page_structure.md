@@ -107,9 +107,11 @@ Each message is rendered as a `.message-row` with a `data-message-id` attribute 
   - Supports attached images (rendered in `.user-message-images-row`) — clickable for fullscreen preview
   - Supports attached PDFs (rendered in `.user-message-files-row`) — clickable for fullscreen preview
   - Text content rendered via `MarkdownRenderer`
+  - **Edit Mode:** When the edit pencil is clicked, the `.user-message-box` transitions from liquid glass to a dark text-input style. A textarea replaces the content with Cancel/Send buttons. The box animates smoothly via CSS transitions + framer-motion `layout`.
   - **Message Actions (`.message-actions`, right-aligned):**
     - **Copy** — Copies the message text to clipboard (icon switches to checkmark on success)
     - **Edit** — Pencil icon for editing the message
+  - **Version Switcher (`.version-switcher`):** When the message has been edited (has `versions[]`), `<>` navigation buttons appear in the same `.user-actions-row` as the other actions, showing the current version number with a 3D vertical flip animation (`rotateX` via framer-motion). Old versions replace the text/response with saved historical data.
 
 - **AI Messages (`.ai-row`):**
   - Rendered inside `.ai-message-ground`
@@ -120,11 +122,12 @@ Each message is rendered as a `.message-row` with a `data-message-id` attribute 
   - Main text content rendered via `MarkdownRenderer`
   - Fallback `ThinkingLoader` shown when neither text nor thought exists
   - **Architecture Trace Block:** If a `trace` record is present, it is rendered at the bottom of the AI message
-  - **Message Actions (`.message-actions`, left-aligned):**
+  - **Message Actions + Version Switcher (`.ai-actions-row`):** A single horizontal flex row containing:
     - **Copy** — Copies the message text to clipboard
     - **Like** — Thumbs up toggle (filled when active)
     - **Dislike** — Thumbs down toggle (filled when active)
     - **Export PDF** — Generates an A4 PDF of the AI message using html2canvas + jsPDF, preserving markdown formatting and KaTeX equations with consistent 18mm margins on every page
+    - **Version Switcher (`.version-switcher`):** Same `<>` navigation as user messages, sharing the active version index via a `versionMap` lifted to ChatWorkspace
   - All action icons are pure SVGs with smooth CSS transitions (color, background, scale) and a 0.9× squash on click
 
 #### Blur Overlays

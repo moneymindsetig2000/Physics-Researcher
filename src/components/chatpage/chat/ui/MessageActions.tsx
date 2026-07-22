@@ -6,9 +6,10 @@ interface MessageActionsProps {
   text: string;
   sender: 'user' | 'ai';
   contentRef?: React.RefObject<HTMLDivElement | null>;
+  onEdit?: () => void;
 }
 
-export function MessageActions({ text, sender, contentRef }: MessageActionsProps) {
+export function MessageActions({ text, sender, contentRef, onEdit }: MessageActionsProps) {
   const [copied, setCopied] = useState(false);
   const [liked, setLiked] = useState<boolean | null>(null);
 
@@ -45,7 +46,7 @@ export function MessageActions({ text, sender, contentRef }: MessageActionsProps
       </button>
 
       {sender === 'user' && (
-        <button className="action-btn" title="Edit">
+        <button className="action-btn" title="Edit" onClick={onEdit}>
           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
             <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />

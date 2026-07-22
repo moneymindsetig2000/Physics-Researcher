@@ -24,6 +24,7 @@ interface Message {
   trace?: TraceRecord;
   images?: string[];
   pdfs?: string[];
+  versions?: { text: string; responseText?: string; responseThought?: string }[];
 }
 
 interface Chat {
@@ -40,6 +41,7 @@ interface ChatWorkspaceProps {
   onToggleLeftSidebar: () => void;
   activeChat: Chat | null;
   onSendPrompt: (promptText: string, attachedImages?: string[], attachedPdfs?: string[]) => void;
+  onEditPrompt?: (userMsgId: string, newText: string, aiMsgId: string) => void;
   isGenerating?: boolean;
   onStopGeneration?: () => void;
   summary?: string | null;
@@ -52,13 +54,25 @@ const MessageItem = React.memo(({
   msg,
   onImageClick,
   onPdfClick,
-  isGenerating
+  isGenerating,
+  onEditMessage,
+  activeVersion,
+  onVersionChange,
+  totalVersions,
+  allVersions
 }: { 
   msg: Message;
   onImageClick?: (url: string) => void;
   onPdfClick?: (url: string) => void;
   isGenerating?: boolean;
+  onEditMessage?: (userMsgId: string, currentText: string) => void;
+  activeVersion?: number;
+  onVersionChange?: (version: number) => void;
+  totalVersions?: number;
+  allVersions?: { text: string; responseText?: string; responseThought?: string }[];
 }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editText, setEditText] = useState('');
   const [isThinkingExpanded, setIsThinkingExpanded] = useState(false);
   const [displayedText, setDisplayedText] = useState('');
   const [displayedThought, setDisplayedThought] = useState('');
@@ -70,18 +84,30 @@ const MessageItem = React.memo(({
   const rafRef = useRef<number | null>(null);
   const thinkingContentRef = useRef<HTMLDivElement>(null);
   const aiContentRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const displayText = msg.sender === 'user' && allVersions && activeVersion !== undefined && activeVersion < (totalVersions ?? 0)
+    ? allVersions[activeVersion].text
+    : msg.text;
+
+  const displayResponseText = msg.sender === 'ai' && allVersions && activeVersion !== undefined && activeVersion < (totalVersions ?? 0) && allVersions[activeVersion].responseText
+    ? allVersions[activeVersion].responseText!
+    : displayedText;
+
+  const displayResponseThought = msg.sender === 'ai' && allVersions && activeVersion !== undefined && activeVersion < (totalVersions ?? 0) && allVersions[activeVersion].responseThought
+    ? allVersions[activeVersion].responseThought!
+    : displayedThought;
 
   generatingRef.current = isGenerating;
   bufferTextRef.current = msg.text;
   bufferThoughtRef.current = msg.thought || '';
 
-  // Scroll thinking content when displayed thought grows
   useEffect(() => {
     if (thinkingContentRef.current) {
       const el = thinkingContentRef.current;
       el.scrollTop = el.scrollHeight;
     }
-  }, [displayedThought]);
+  }, [displayResponseThought]);
 
   useEffect(() => {
     if (aiContentRef.current) {
@@ -90,7 +116,7 @@ const MessageItem = React.memo(({
         parent.scrollTop = parent.scrollHeight;
       }
     }
-  }, [displayedText]);
+  }, [displayResponseText]);
 
   const scrollToBottom = useCallback(() => {
     if (aiContentRef.current) {
@@ -101,7 +127,6 @@ const MessageItem = React.memo(({
     }
   }, []);
 
-  // Typewriter RAF loop
   useEffect(() => {
     if (!generatingRef.current) {
       indexTextRef.current = bufferTextRef.current.length;
@@ -110,6 +135,9 @@ const MessageItem = React.memo(({
       setDisplayedThought(bufferThoughtRef.current);
       return;
     }
+
+    // Don't restart typewriter for messages that already have content (edit of another msg)
+    if (bufferTextRef.current) return;
 
     indexTextRef.current = 0;
     indexThoughtRef.current = 0;
@@ -151,9 +179,8 @@ const MessageItem = React.memo(({
     return () => {
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
     };
-  }, [msg.id]);
+  }, [msg.id, isGenerating]);
 
-  // When generating stops, reveal remaining text in one smooth step
   useEffect(() => {
     if (!isGenerating) {
       indexTextRef.current = bufferTextRef.current.length;
@@ -164,8 +191,41 @@ const MessageItem = React.memo(({
     }
   }, [isGenerating, scrollToBottom]);
 
-  const typewriterDone = displayedText.length >= (msg.text?.length || 0) &&
-    displayedThought.length >= ((msg.thought || '').length || 0);
+  const typewriterDone = displayResponseText.length >= (msg.text?.length || 0) &&
+    displayResponseThought.length >= ((msg.thought || '').length || 0);
+
+  const handleEditStart = () => {
+    setEditText(displayText);
+    setIsEditing(true);
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+        textareaRef.current.setSelectionRange(editText.length, editText.length);
+      }
+    }, 50);
+  };
+
+  const handleEditCancel = () => {
+    setIsEditing(false);
+    setEditText('');
+  };
+
+  const handleEditSend = () => {
+    if (!editText.trim() || !onEditMessage) return;
+    onEditMessage(msg.id, editText.trim());
+    setIsEditing(false);
+    setEditText('');
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleEditSend();
+    }
+    if (e.key === 'Escape') {
+      handleEditCancel();
+    }
+  };
 
   return (
     <div className={`message-row ${msg.sender === 'user' ? 'user-row' : 'ai-row'}`} data-message-id={msg.id}>
@@ -202,10 +262,69 @@ const MessageItem = React.memo(({
               ))}
             </div>
           )}
-          <div className="user-message-box">
-            <MarkdownRenderer content={msg.text} />
-          </div>
-          <MessageActions text={msg.text} sender="user" />
+          <motion.div
+            layout
+            className={`user-message-box${isEditing ? ' editing' : ''}`}
+            transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+          >
+            {isEditing ? (
+              <>
+                <textarea
+                  ref={textareaRef}
+                  className="edit-textarea"
+                  value={editText}
+                  onChange={(e) => setEditText(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  autoFocus
+                />
+                <div className="edit-actions">
+                  <button className="edit-btn edit-cancel-btn" onClick={handleEditCancel}>Cancel</button>
+                  <button className="edit-btn edit-send-btn" onClick={handleEditSend}>Send</button>
+                </div>
+              </>
+            ) : (
+              <MarkdownRenderer content={displayText} />
+            )}
+          </motion.div>
+          {!isEditing && (
+            <div className="user-actions-row">
+              {totalVersions && totalVersions > 0 && (
+                <div className="version-switcher">
+                  <button
+                    className="version-nav-btn"
+                    onClick={() => onVersionChange?.((activeVersion ?? 0) - 1)}
+                    disabled={activeVersion === 0}
+                  >
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="15 18 9 12 15 6" />
+                    </svg>
+                  </button>
+                  <div className="version-counter">
+                    <motion.span
+                      className="version-current"
+                      key={activeVersion}
+                      initial={{ rotateX: -90, opacity: 0 }}
+                      animate={{ rotateX: 0, opacity: 1 }}
+                      transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                      style={{ perspective: 120 }}
+                    >{activeVersion! + 1}</motion.span>
+                    <span className="version-sep">/</span>
+                    <span className="version-total">{totalVersions}</span>
+                  </div>
+                  <button
+                    className="version-nav-btn"
+                    onClick={() => onVersionChange?.((activeVersion ?? 0) + 1)}
+                    disabled={activeVersion === (totalVersions ?? 1) - 1}
+                  >
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="9 18 15 12 9 6" />
+                    </svg>
+                  </button>
+                </div>
+              )}
+              <MessageActions text={displayText} sender="user" onEdit={handleEditStart} />
+            </div>
+          )}
         </div>
       ) : (
         <div className="ai-message-ground">
@@ -231,17 +350,55 @@ const MessageItem = React.memo(({
                   </svg>
                 </button>
               </div>
-              <div ref={thinkingContentRef} className={`thinking-content ${isThinkingExpanded ? 'expanded' : 'collapsed'}`}>{displayedThought}</div>
+              <div ref={thinkingContentRef} className={`thinking-content ${isThinkingExpanded ? 'expanded' : 'collapsed'}`}>{displayResponseThought}</div>
             </motion.div>
           )}
-          {displayedText && <div ref={aiContentRef}><MarkdownRenderer content={displayedText} /></div>}
+          {displayResponseText && <div ref={aiContentRef}><MarkdownRenderer content={displayResponseText} /></div>}
           {!bufferThoughtRef.current && !bufferTextRef.current && (
             <div className="ai-message-loader">
               <ThinkingLoader />
             </div>
           )}
           {msg.trace && <ArchitectureTraceBlock trace={msg.trace} />}
-          {typewriterDone && !isGenerating && displayedText && <MessageActions text={msg.text} sender="ai" contentRef={aiContentRef} />}
+          {typewriterDone && !isGenerating && displayResponseText && (
+            <div className="ai-actions-row">
+              <MessageActions text={msg.text} sender="ai" contentRef={aiContentRef} />
+              {totalVersions && totalVersions > 0 && (
+                <div className="version-switcher">
+                  <button
+                    className="version-nav-btn"
+                    onClick={() => onVersionChange?.((activeVersion ?? 0) - 1)}
+                    disabled={activeVersion === 0}
+                  >
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="15 18 9 12 15 6" />
+                    </svg>
+                  </button>
+                  <div className="version-counter">
+                    <motion.span
+                      className="version-current"
+                      key={activeVersion}
+                      initial={{ rotateX: -90, opacity: 0 }}
+                      animate={{ rotateX: 0, opacity: 1 }}
+                      transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                      style={{ perspective: 120 }}
+                    >{activeVersion! + 1}</motion.span>
+                    <span className="version-sep">/</span>
+                    <span className="version-total">{totalVersions}</span>
+                  </div>
+                  <button
+                    className="version-nav-btn"
+                    onClick={() => onVersionChange?.((activeVersion ?? 0) + 1)}
+                    disabled={activeVersion === (totalVersions ?? 1) - 1}
+                  >
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="9 18 15 12 9 6" />
+                    </svg>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -253,6 +410,8 @@ const MessageItem = React.memo(({
     prevProps.msg.thought === nextProps.msg.thought &&
     prevProps.msg.trace === nextProps.msg.trace &&
     prevProps.isGenerating === nextProps.isGenerating &&
+    prevProps.activeVersion === nextProps.activeVersion &&
+    prevProps.totalVersions === nextProps.totalVersions &&
     (prevProps.msg.images === nextProps.msg.images || 
       (Array.isArray(prevProps.msg.images) && Array.isArray(nextProps.msg.images) && 
        prevProps.msg.images.length === nextProps.msg.images.length &&
@@ -271,6 +430,7 @@ export function ChatWorkspace({
   onToggleLeftSidebar,
   activeChat,
   onSendPrompt,
+  onEditPrompt,
   isGenerating,
   onStopGeneration,
   summary,
@@ -286,6 +446,7 @@ export function ChatWorkspace({
     position: { top: number; left: number } | null;
   } | null>(null);
   const [showSummaryPopup, setShowSummaryPopup] = useState(false);
+  const [versionMap, setVersionMap] = useState<Record<string, number>>({});
   const conversationFlowRef = useRef<HTMLDivElement>(null);
   const hasActiveSelectionRef = useRef(false);
   const mouseUpPosRef = useRef<{ x: number; y: number } | null>(null);
@@ -373,6 +534,24 @@ export function ChatWorkspace({
     setTaggedText(null);
   };
 
+  const handleEditMessage = (userMsgId: string, newText: string) => {
+    if (!onEditPrompt || !activeChat) return;
+    const msgs = activeChat.messages;
+    const userIdx = msgs.findIndex(m => m.id === userMsgId);
+    if (userIdx === -1 || userIdx + 1 >= msgs.length) return;
+    const aiMsg = msgs[userIdx + 1];
+    if (aiMsg.sender !== 'ai') return;
+    onEditPrompt(userMsgId, newText, aiMsg.id);
+    setVersionMap(prev => {
+      const versionsCount = (msgs[userIdx].versions?.length ?? 0) + 1;
+      return { ...prev, [userMsgId]: versionsCount };
+    });
+  };
+
+  const handleVersionChange = (userMsgId: string, version: number) => {
+    setVersionMap(prev => ({ ...prev, [userMsgId]: version }));
+  };
+
   const handleSend = (
     attachedImages: string[],
     attachedPdfs: string[]
@@ -409,10 +588,37 @@ export function ChatWorkspace({
             {activeChat.messages.map((msg, idx) => {
               const prev = idx > 0 ? activeChat.messages[idx - 1] : null;
               const showDivider = prev && prev.sender === 'ai' && msg.sender === 'user';
+
+              const prevUserMsg = msg.sender === 'ai' && idx > 0 && activeChat.messages[idx - 1].sender === 'user'
+                ? activeChat.messages[idx - 1]
+                : null;
+
+              const userMsgForVersion = msg.sender === 'user' ? msg : prevUserMsg;
+              const hasVersions = userMsgForVersion && (userMsgForVersion.versions?.length ?? 0) > 0;
+              const totalVersions = hasVersions ? (userMsgForVersion!.versions!.length + 1) : 0;
+              const activeVer = hasVersions ? (versionMap[userMsgForVersion!.id] ?? totalVersions - 1) : 0;
+              const allVersions = hasVersions
+                ? [...userMsgForVersion!.versions!, { text: userMsgForVersion!.text, responseText: undefined, responseThought: undefined }]
+                : undefined;
+
+              const handleVerChange = hasVersions
+                ? (v: number) => handleVersionChange(userMsgForVersion!.id, v)
+                : undefined;
+
               return (
                 <React.Fragment key={msg.id}>
                   {showDivider && <ConversationDivider />}
-                  <MessageItem msg={msg} onImageClick={setPreviewImage} onPdfClick={setPreviewPdf} isGenerating={isGenerating} />
+                  <MessageItem
+                    msg={msg}
+                    onImageClick={setPreviewImage}
+                    onPdfClick={setPreviewPdf}
+                    isGenerating={isGenerating}
+                    onEditMessage={handleEditMessage}
+                    activeVersion={activeVer}
+                    onVersionChange={handleVerChange}
+                    totalVersions={totalVersions}
+                    allVersions={allVersions}
+                  />
                 </React.Fragment>
               );
             })}

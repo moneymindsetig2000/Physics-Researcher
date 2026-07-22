@@ -32,6 +32,14 @@
     │   │
     │   ├── BlurOverlays (top + bottom)
     │   │
+    │   ├── MessageItem (per message)
+    │   │   ├── MarkdownRenderer
+    │   │   ├── ThinkingLoader
+    │   │   ├── ArchitectureTraceBlock
+    │   │   ├── Textarea (edit mode, user msg)
+    │   │   ├── MessageActions (copy, edit, like, dislike, pdf)
+    │   │   └── VersionSwitcher (< > buttons + counter)
+    │   │
     │   ├── UserPromptScrubber
     │   │
     │   ├── ComposerContainer

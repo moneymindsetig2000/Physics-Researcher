@@ -17,6 +17,7 @@ interface Message {
   trace?: TraceRecord;
   images?: string[];
   pdfs?: string[];
+  versions?: { text: string; responseText?: string; responseThought?: string }[];
 }
 
 interface Chat {
@@ -388,6 +389,166 @@ export function ChatPage() {
     }
   }, [activeChatId, chats, memories]);
 
+  const handleEditPrompt = useCallback(async (
+    userMsgId: string,
+    newText: string,
+    aiMsgId: string
+  ) => {
+    if (!newText.trim()) return;
+
+    const activeChat = chats.find(c => c.id === activeChatId);
+    if (!activeChat) return;
+
+    const existingSummary = activeChat?.summary ?? null;
+
+    // Extract chat history excluding the messages being edited
+    const msgIndex = activeChat.messages.findIndex(m => m.id === userMsgId);
+    const historyMessages = activeChat.messages.slice(0, msgIndex).map(msg => ({
+      sender: msg.sender,
+      text: msg.text
+    }));
+
+    // Save old version and update the user + AI messages
+    const aiMsg = activeChat.messages.find(m => m.id === aiMsgId);
+
+    setChats(prev => prev.map(chat => {
+      if (chat.id !== activeChatId) return chat;
+      return {
+        ...chat,
+        messages: chat.messages.map(msg => {
+          if (msg.id === userMsgId) {
+            const existingVersions = msg.versions || [];
+            return {
+              ...msg,
+              text: newText,
+              versions: [
+                ...existingVersions,
+                { text: msg.text, responseText: aiMsg?.text, responseThought: aiMsg?.thought }
+              ]
+            };
+          }
+          if (msg.id === aiMsgId) {
+            return { ...msg, text: '', thought: undefined, trace: undefined };
+          }
+          return msg;
+        })
+      };
+    }));
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    setIsGenerating(true);
+
+    try {
+      const result = await runQueryPipelineStream(
+        newText,
+        memories,
+        (chunk) => {
+          setChats(prev => prev.map(chat => {
+            if (chat.id !== activeChatId) return chat;
+            return {
+              ...chat,
+              messages: chat.messages.map(msg => {
+                if (msg.id === aiMsgId) {
+                  return { ...msg, text: chunk.text, thought: chunk.thought };
+                }
+                return msg;
+              })
+            };
+          }));
+        },
+        historyMessages,
+        undefined,
+        undefined,
+        controller.signal
+      );
+
+      setChats(prev => prev.map(chat => {
+        if (chat.id !== activeChatId) return chat;
+        return {
+          ...chat,
+          messages: chat.messages.map(msg => {
+            if (msg.id === aiMsgId) {
+              return { ...msg, text: result.replyText, thought: msg.thought, trace: result.trace };
+            }
+            return msg;
+          })
+        };
+      }));
+
+      let activeMemories = memories;
+      if (result.deletedMemoryId) {
+        activeMemories = activeMemories.filter(m => m.id !== result.deletedMemoryId);
+        setMemories(activeMemories);
+        localStorage.setItem('physica_ai_memories', JSON.stringify(activeMemories));
+      }
+      if (result.newMemoryCreated) {
+        activeMemories = [...activeMemories, result.newMemoryCreated];
+        setMemories(activeMemories);
+        localStorage.setItem('physica_ai_memories', JSON.stringify(activeMemories));
+      }
+
+      if (activeChatId) {
+        const newExchange = [
+          { sender: 'user' as const, text: newText },
+          { sender: 'ai' as const, text: result.replyText }
+        ];
+        setIsSummaryGenerating(true);
+        generateSummary(newExchange, undefined, existingSummary).then(summary => {
+          if (summary) {
+            setChats(prev => prev.map(chat => {
+              if (chat.id === activeChatId) {
+                return { ...chat, summary };
+              }
+              return chat;
+            }));
+          }
+        }).catch(() => {}).finally(() => {
+          setIsSummaryGenerating(false);
+        });
+      }
+    } catch (err: any) {
+      if (err.name === 'AbortError' || err.message?.includes('aborted') || err.message?.includes('AbortError')) {
+        setChats(prev => prev.map(chat => {
+          if (chat.id !== activeChatId) return chat;
+          return {
+            ...chat,
+            messages: chat.messages.map(msg => {
+              if (msg.id === aiMsgId) {
+                const baseText = msg.text ? msg.text.trim() : '';
+                return {
+                  ...msg,
+                  text: baseText ? `${baseText}\n\n*Generation stopped by user.*` : '*Generation stopped by user.*'
+                };
+              }
+              return msg;
+            })
+          };
+        }));
+        return;
+      }
+      console.error('Edit prompt execution failed:', err);
+      const errMsg = err instanceof Error ? err.message : String(err);
+      setChats(prev => prev.map(chat => {
+        if (chat.id !== activeChatId) return chat;
+        return {
+          ...chat,
+          messages: chat.messages.map(msg => {
+            if (msg.id === aiMsgId) {
+              return { ...msg, text: `⚠️ **Edit Execution Failed**\n\nError details:\n\`\`\`text\n${errMsg}\n\`\`\`` };
+            }
+            return msg;
+          })
+        };
+      }));
+    } finally {
+      setIsGenerating(false);
+      if (abortControllerRef.current === controller) {
+        abortControllerRef.current = null;
+      }
+    }
+  }, [activeChatId, chats, memories]);
+
   const activeChat = useMemo(
     () => chats.find(c => c.id === activeChatId) || null,
     [chats, activeChatId]
@@ -465,6 +626,7 @@ export function ChatPage() {
         onToggleLeftSidebar={handleToggleLeftSidebar}
         activeChat={activeChat}
         onSendPrompt={handleSendPrompt}
+        onEditPrompt={handleEditPrompt}
         isGenerating={isGenerating}
         onStopGeneration={handleStopGeneration}
         summary={activeChat?.summary}
