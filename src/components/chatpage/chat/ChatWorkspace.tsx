@@ -288,7 +288,7 @@ const MessageItem = React.memo(({
           </motion.div>
           {!isEditing && (
             <div className="user-actions-row">
-              {totalVersions && totalVersions > 0 && (
+              {totalVersions > 0 && (
                 <div className="version-switcher">
                   <button
                     className="version-nav-btn"
@@ -363,7 +363,7 @@ const MessageItem = React.memo(({
           {typewriterDone && !isGenerating && displayResponseText && (
             <div className="ai-actions-row">
               <MessageActions text={msg.text} sender="ai" contentRef={aiContentRef} />
-              {totalVersions && totalVersions > 0 && (
+              {totalVersions > 0 && (
                 <div className="version-switcher">
                   <button
                     className="version-nav-btn"

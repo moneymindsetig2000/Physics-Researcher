@@ -808,6 +808,7 @@
   box-shadow: none;
   padding: 0;
   max-width: 90%;
+  width: 100%;
   overflow: visible;
 }
 
@@ -822,8 +823,8 @@
 
 .user-message-box.editing .edit-textarea {
   width: 100%;
-  min-height: 120px;
-  max-height: 300px;
+  min-height: 160px;
+  max-height: 400px;
   background: transparent;
   border: none;
   border-radius: 12px 12px 0 0;
