@@ -184,6 +184,7 @@ export interface PipelineResult {
   trace: TraceRecord;
   newMemoryCreated?: MemoryRecord;
   deletedMemoryId?: string;
+  questionForm?: { question: string; options: string[] };
 }
 
 /**
@@ -235,7 +236,7 @@ function buildContents(
 export async function runQueryPipelineStream(
   userQuery: string,
   memories: MemoryRecord[],
-  onChunk: (data: { text: string; thought: string }) => void,
+  onChunk: (data: { text: string; thought: string; questionForm?: { question: string; options: string[] } }) => void,
   chatHistory?: { sender: 'user' | 'ai'; text: string }[],
   images?: { mimeType: string; base64Data: string }[],
   pdfs?: { mimeType: string; base64Data: string }[],
@@ -467,7 +468,12 @@ export async function runQueryPipelineStream(
   const parsedXml = parseMemoryActionXml(finalReplyText);
   finalReplyText = parsedXml.cleanText;
 
-  onChunk({ text: finalReplyText, thought: finalThought });
+  // Parse <question_form> XML for interactive question
+  const parsedQf = parseQuestionFormXml(finalReplyText);
+  finalReplyText = parsedQf.cleanText;
+  const questionForm = parsedQf.questionForm;
+
+  onChunk({ text: finalReplyText, thought: finalThought, questionForm });
 
   let newMemoryCreated: MemoryRecord | undefined = undefined;
   let deletedMemoryId: string | undefined = undefined;
@@ -547,7 +553,8 @@ export async function runQueryPipelineStream(
     replyText: finalReplyText,
     trace,
     newMemoryCreated,
-    deletedMemoryId
+    deletedMemoryId,
+    questionForm
   };
 }
 
@@ -614,6 +621,33 @@ function parseMemoryActionXml(text: string): {
   }
 
   return result;
+}
+
+/**
+ * Parses a <question_form> XML block from the model's response text.
+ * Extracts question and options, returns cleaned text with the XML stripped.
+ */
+function parseQuestionFormXml(text: string): {
+  cleanText: string;
+  questionForm: { question: string; options: string[] } | null;
+} {
+  const match = text.match(/<question_form>([\s\S]*?)<\/question_form>/i);
+  if (!match) return { cleanText: text, questionForm: null };
+
+  try {
+    const parsed = JSON.parse(match[1].trim());
+    if (parsed.question && Array.isArray(parsed.options) && parsed.options.length >= 2) {
+      const cleanText = text.replace(/<question_form>[\s\S]*?<\/question_form>/, "").trimEnd();
+      return {
+        cleanText,
+        questionForm: {
+          question: parsed.question,
+          options: parsed.options.slice(0, 4)
+        }
+      };
+    }
+  } catch {}
+  return { cleanText: text, questionForm: null };
 }
 
 /**

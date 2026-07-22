@@ -18,6 +18,7 @@ interface Message {
   images?: string[];
   pdfs?: string[];
   versions?: { text: string; responseText?: string; responseThought?: string }[];
+  questionForm?: { question: string; options: string[] };
 }
 
 interface Chat {
@@ -264,7 +265,8 @@ export function ChatPage() {
                     return {
                       ...msg,
                       text: chunk.text,
-                      thought: chunk.thought
+                      thought: chunk.thought,
+                      questionForm: chunk.questionForm
                     };
                   }
                   return msg;
@@ -291,7 +293,8 @@ export function ChatPage() {
                   ...msg,
                   text: result.replyText,
                   thought: msg.thought,
-                  trace: result.trace
+                  trace: result.trace,
+                  questionForm: result.questionForm
                 };
               }
               return msg;
@@ -450,7 +453,7 @@ export function ChatPage() {
               ...chat,
               messages: chat.messages.map(msg => {
                 if (msg.id === aiMsgId) {
-                  return { ...msg, text: chunk.text, thought: chunk.thought };
+                  return { ...msg, text: chunk.text, thought: chunk.thought, questionForm: chunk.questionForm };
                 }
                 return msg;
               })
@@ -469,7 +472,7 @@ export function ChatPage() {
           ...chat,
           messages: chat.messages.map(msg => {
             if (msg.id === aiMsgId) {
-              return { ...msg, text: result.replyText, thought: msg.thought, trace: result.trace };
+              return { ...msg, text: result.replyText, thought: msg.thought, trace: result.trace, questionForm: result.questionForm };
             }
             return msg;
           })

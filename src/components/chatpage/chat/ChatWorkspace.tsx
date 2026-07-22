@@ -13,6 +13,7 @@ import { ConversationDivider } from './ui/ConversationDivider';
 import { MessageActions } from './ui/MessageActions';
 import { SelectionToolbar } from './ui/SelectionToolbar';
 import { SummaryPopup } from './ui/SummaryPopup';
+import { QuestionForm } from './ui/QuestionForm';
 import type { TraceRecord } from '../../../utils/ai/types';
 import './ChatWorkspace.css';
 
@@ -24,7 +25,8 @@ interface Message {
   trace?: TraceRecord;
   images?: string[];
   pdfs?: string[];
-  versions?: { text: string; responseText?: string; responseThought?: string }[];
+  versions?: { text: string; responseText?: string; responseThought?: string; questionForm?: { question: string; options: string[] } }[];
+  questionForm?: { question: string; options: string[] };
 }
 
 interface Chat {
@@ -59,7 +61,8 @@ const MessageItem = React.memo(({
   activeVersion,
   onVersionChange,
   totalVersions,
-  allVersions
+  allVersions,
+  onSendPrompt
 }: { 
   msg: Message;
   onImageClick?: (url: string) => void;
@@ -70,6 +73,7 @@ const MessageItem = React.memo(({
   onVersionChange?: (version: number) => void;
   totalVersions?: number;
   allVersions?: { text: string; responseText?: string; responseThought?: string }[];
+  onSendPrompt?: (text: string) => void;
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState('');
@@ -97,6 +101,10 @@ const MessageItem = React.memo(({
   const displayResponseThought = msg.sender === 'ai' && allVersions && activeVersion !== undefined && activeVersion < (totalVersions ?? 0) && allVersions[activeVersion].responseThought
     ? allVersions[activeVersion].responseThought!
     : displayedThought;
+
+  const displayQuestionForm = msg.sender === 'ai' && allVersions && activeVersion !== undefined && activeVersion < (totalVersions ?? 0) && allVersions[activeVersion].questionForm
+    ? allVersions[activeVersion].questionForm!
+    : msg.questionForm;
 
   generatingRef.current = isGenerating;
   bufferTextRef.current = msg.text;
@@ -360,6 +368,13 @@ const MessageItem = React.memo(({
             </div>
           )}
           {msg.trace && <ArchitectureTraceBlock trace={msg.trace} />}
+          {displayQuestionForm && typewriterDone && !isGenerating && (
+            <QuestionForm
+              question={displayQuestionForm.question}
+              options={displayQuestionForm.options}
+              onAnswer={(answer) => onSendPrompt?.(answer)}
+            />
+          )}
           {typewriterDone && !isGenerating && displayResponseText && (
             <div className="ai-actions-row">
               <MessageActions text={msg.text} sender="ai" contentRef={aiContentRef} />
@@ -618,6 +633,7 @@ export function ChatWorkspace({
                     onVersionChange={handleVerChange}
                     totalVersions={totalVersions}
                     allVersions={allVersions}
+                    onSendPrompt={(text) => onSendPrompt(text)}
                   />
                 </React.Fragment>
               );
