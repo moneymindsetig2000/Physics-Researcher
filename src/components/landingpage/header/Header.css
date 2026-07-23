@@ -112,7 +112,8 @@
 }
 
 @media (max-width: 640px) {
-  .floating-header {
+/* Radha */
+.floating-header {
     width: 92%;
     top: 20px;
   }

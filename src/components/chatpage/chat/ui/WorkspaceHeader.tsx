@@ -1,4 +1,5 @@
-interface WorkspaceHeaderProps {
+// Radha
+interface WorkspaceHeaderProps { // Radha
   isRightSidebarCollapsed: boolean;
   onToggleRightSidebar: () => void;
   isLeftSidebarCollapsed: boolean;

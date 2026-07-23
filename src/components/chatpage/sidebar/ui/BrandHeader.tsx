@@ -1,4 +1,5 @@
-interface BrandHeaderProps {
+// Radha
+interface BrandHeaderProps { // Radha
   onToggleCollapse: () => void;
 }
 

@@ -4,7 +4,7 @@
 
 ## Project Overview
 
-Physica AI is an AI-powered research platform built specifically for physics researchers, professors, PhD students, masters students, research groups, academic institutions, and anyone working with scientific literature.
+Physica AI is an AI-powered research platform built exclusively for **Radha** — a personalized physics research companion crafted for her master's studies and academic journey.
 
 The platform is designed to help users discover, understand, analyze, summarize, and explore research papers significantly faster than traditional academic workflows.
 

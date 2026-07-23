@@ -1,6 +1,9 @@
 import React, { useRef, useEffect, useState } from 'react';
 
-interface ComposerInputProps {
+// Radha
+interface ComposerInputProps { // Radha
+
+  // Radha
   message: string;
   onChange: (message: string) => void;
   onSend: (attachedImages: string[], attachedPdfs: string[]) => void;

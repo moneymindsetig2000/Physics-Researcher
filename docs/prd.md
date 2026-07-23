@@ -3,6 +3,7 @@
 > **Product Name:** Physica AI  
 > **Code Name:** Researcher  
 > **Tagline:** "The Research Partner Built For Physics."  
+> **Built For:** Radha  
 > **Version:** 0.0.0  
 > **Stack:** React 19 + Vite 8 + TypeScript 6 + Jessie
 
@@ -54,6 +55,8 @@ Modern researchers face an overwhelming amount of scientific literature. Thousan
 ---
 
 ## 2. Target Audience
+
+This platform is built exclusively for **Radha** — personalized for her physics studies, research, and academic journey. No other users or accounts exist.
 
 | Audience | Primary Need |
 |----------|-------------|

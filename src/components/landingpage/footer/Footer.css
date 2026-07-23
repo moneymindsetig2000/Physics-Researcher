@@ -208,7 +208,8 @@
 }
 
 @media (max-width: 768px) {
-  .footer-section {
+/* Radha */
+.footer-section {
     padding: 4rem 1.5rem 2rem 1.5rem;
   }
 

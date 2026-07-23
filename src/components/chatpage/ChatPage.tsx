@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { motion } from 'motion/react';
 import { Sidebar } from './sidebar/Sidebar';
 import { ChatWorkspace } from './chat/ChatWorkspace';
 import { RightSidebar } from './rightsidebar/RightSidebar';
@@ -29,7 +30,10 @@ interface Chat {
   summary?: string | null;
 }
 
-export function ChatPage() {
+export // Radha
+function ChatPage() { // Radha
+
+  // Radha
   const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] = useState(false);
   const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed] = useState(false);
   const [chats, setChats] = useState<Chat[]>(() => {
@@ -609,19 +613,26 @@ export function ChatPage() {
   return (
     <div className="supernova-chat-page" id="supernova-chat-page-root">
       {/* 3-Pane Layout */}
-      <Sidebar 
-        isCollapsed={isLeftSidebarCollapsed} 
-        onToggleCollapse={handleToggleLeftSidebar}
-        chats={sidebarChats}
-        activeChatId={activeChatId}
-        onSelectChat={setActiveChatId}
-        onNewChat={handleNewChat}
-        onDeleteChat={handleDeleteChat}
-        onTogglePinChat={handleTogglePinChat}
-        memories={memories}
-        onUpdateMemories={handleUpdateMemories}
-        onClearAllChats={handleClearAllChats}
-      />
+      <motion.div
+        initial={{ x: -250 }}
+        animate={{ x: 0 }}
+        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+        style={{ display: 'flex', flexShrink: 0 }}
+      >
+        <Sidebar 
+          isCollapsed={isLeftSidebarCollapsed} 
+          onToggleCollapse={handleToggleLeftSidebar}
+          chats={sidebarChats}
+          activeChatId={activeChatId}
+          onSelectChat={setActiveChatId}
+          onNewChat={handleNewChat}
+          onDeleteChat={handleDeleteChat}
+          onTogglePinChat={handleTogglePinChat}
+          memories={memories}
+          onUpdateMemories={handleUpdateMemories}
+          onClearAllChats={handleClearAllChats}
+        />
+      </motion.div>
       <ChatWorkspace 
         isRightSidebarCollapsed={isRightSidebarCollapsed}
         onToggleRightSidebar={handleToggleRightSidebar}
@@ -635,13 +646,20 @@ export function ChatPage() {
         summary={activeChat?.summary}
         isSummaryGenerating={isSummaryGenerating}
       />
-      <RightSidebar 
-        isCollapsed={isRightSidebarCollapsed} 
-        onToggleCollapse={handleToggleRightSidebar} 
-        memories={memories}
-        onUpdateMemories={handleUpdateMemories}
-        chatMessages={activeChat?.messages || []}
-      />
+      <motion.div
+        initial={{ x: 280 }}
+        animate={{ x: 0 }}
+        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+        style={{ display: 'flex', flexShrink: 0 }}
+      >
+        <RightSidebar 
+          isCollapsed={isRightSidebarCollapsed} 
+          onToggleCollapse={handleToggleRightSidebar} 
+          memories={memories}
+          onUpdateMemories={handleUpdateMemories}
+          chatMessages={activeChat?.messages || []}
+        />
+      </motion.div>
 
       {/* New Chat Dialog */}
       <NewChatDialog

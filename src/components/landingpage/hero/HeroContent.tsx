@@ -286,6 +286,7 @@ export function HeroContent() {
             <button className="btn-liquid-glass" id="btn-lets-go" onClick={navigateToChat}>
               Let's Go
             </button>
+            <p className="hero-dedication">For Radha</p>
           </div>
         </div>
       </div>

@@ -50,7 +50,8 @@ interface ChatWorkspaceProps {
   isSummaryGenerating?: boolean;
 }
 
-const TYPEWRITER_SPEED = 4;
+// Radha
+const TYPEWRITER_SPEED = 4; // Radha
 
 const MessageItem = React.memo(({ 
   msg,

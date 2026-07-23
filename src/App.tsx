@@ -10,8 +10,9 @@ import { CTASection } from "./components/landingpage/ctasection/CTASection"
 import { Footer } from "./components/landingpage/footer/Footer"
 import { ChatPage } from "./components/chatpage/ChatPage"
 
+// Radha
 function App() {
-  const [isChat, setIsChat] = useState(window.location.pathname === "/chat")
+  const [isChat, setIsChat] = useState(window.location.pathname === "/chat") // Radha
 
   useEffect(() => {
     const handleRouteChange = () => {

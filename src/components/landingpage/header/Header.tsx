@@ -1,6 +1,7 @@
-import './Header.css';
+import './Header.css'; // Radha
 
-export function Header() {
+// Radha
+export function Header() { // Radha
   const handleSignUp = () => {
     window.history.pushState({}, '', '/chat');
     window.dispatchEvent(new PopStateEvent('popstate'));

@@ -125,7 +125,7 @@ export function Footer() {
         <div className="footer-bottom">
           <div className="footer-bottom-inner">
             <span className="footer-copyright" id="footer-copyright-text">
-              © 2026 Physica AI
+              © 2026 Physica AI · For Radha
             </span>
             <span className="footer-mission" id="footer-mission-text">
               Designed to make scientific knowledge more accessible, understandable, and discoverable.
