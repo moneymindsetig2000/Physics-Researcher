@@ -1,11 +1,31 @@
+import { useMemo } from 'react';
 import { motion } from 'motion/react';
 import { PromptCardsGrid } from './PromptCardsGrid';
+
+const HEADINGS = [
+  "Radha's physics research companion",
+  "Radha's back",
+  "Radha's research hub",
+  "Radha's physics co-pilot",
+  "Radha's discovery space",
+  "Radha's science studio",
+  "Radha's intellect lab",
+  "Radha's quantum sidekick",
+  "Radha's inquiry engine",
+  "Radha's cosmic workshop",
+  "Radha's thought forge",
+  "Radha's mind palace",
+  "Radha's knowledge cosmos",
+  "Radha's pursuit of truth",
+  "Radha's bright idea",
+];
 
 interface WelcomeStateProps {
   onSelectPrompt: (promptText: string) => void;
 }
 
 export function WelcomeState({ onSelectPrompt }: WelcomeStateProps) {
+  const heading = useMemo(() => HEADINGS[Math.floor(Math.random() * HEADINGS.length)], []);
   return (
     <div className="welcome-state">
       <motion.svg
@@ -29,7 +49,7 @@ export function WelcomeState({ onSelectPrompt }: WelcomeStateProps) {
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
       >
-        Radha's physics research companion
+        {heading}
       </motion.h2>
       <motion.p
         className="welcome-subtitle"

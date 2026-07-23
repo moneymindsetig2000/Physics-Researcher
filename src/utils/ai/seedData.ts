@@ -35,14 +35,5 @@ export const SEED_MEMORIES_RAW = [
  * Maps raw seed memories into full MemoryRecord structures with dummy empty embeddings.
  */
 export function getInitialSeedMemories(): MemoryRecord[] {
-  return SEED_MEMORIES_RAW.map((raw, index) => ({
-    id: `mem_seed_${index + 1}`,
-    title: raw.title,
-    description: raw.description,
-    category: raw.category,
-    memory: raw.memory,
-    importance: raw.importance,
-    createdAt: Date.now() - (index * 3600000), // Slightly offset timestamps
-    embedding: [] // Start as empty, will auto-embed when live key is present
-  }));
+  return [];
 }

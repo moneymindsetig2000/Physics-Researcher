@@ -5,7 +5,6 @@ import { ChatWorkspace } from './chat/ChatWorkspace';
 import { RightSidebar } from './rightsidebar/RightSidebar';
 import type { MemoryRecord, TraceRecord } from '../../utils/ai/types';
 import { runQueryPipelineStream, embedText } from '../../utils/ai/gemini';
-import { getInitialSeedMemories } from '../../utils/ai/seedData';
 import { generateSummary } from '../../utils/ai/summaryGenerator';
 import { NewChatDialog } from './chat/ui/NewChatDialog';
 import './ChatPage.css';
@@ -62,18 +61,8 @@ function ChatPage() { // Radha
     return null;
   });
   const [memories, setMemories] = useState<MemoryRecord[]>(() => {
-    const stored = localStorage.getItem('physica_ai_memories');
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        if (parsed.length > 0) return parsed;
-      } catch (e) {
-        console.error("Failed to parse stored memories", e);
-      }
-    }
-    const seed = getInitialSeedMemories();
-    localStorage.setItem('physica_ai_memories', JSON.stringify(seed));
-    return seed;
+    localStorage.setItem('physica_ai_memories', JSON.stringify([]));
+    return [];
   });
   
   // Ref to track whether seed embeddings have been processed — prevents the

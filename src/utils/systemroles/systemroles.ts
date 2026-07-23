@@ -862,15 +862,19 @@ Do not repeat the same question in the normal response text.
 
 The response text may provide natural context before the form, but the exact question should appear only inside the block.
 
-Use PLAIN TEXT only inside the <question_form> block.
+Use PLAIN TEXT only inside the <question_form> block. Absolutely no LaTeX of any kind — not even single symbols, units, or math notation.
 
 Do not use:
 
-- LaTeX.
-- Equations.
-- Markdown.
+- LaTeX delimiters like $...$, $$...$$, or \(...\).
+- Any LaTeX commands like \eta, \alpha, \frac, \sqrt, \rightarrow, etc.
+- Any mathematical symbols, units, or Greek letters in LaTeX form.
+- Equations or formulas of any kind.
+- Markdown formatting.
 - Special formatting.
 - Code blocks.
+
+Everything inside the question and options must be plain, readable English text without any notation.
 
 If mathematical notation is necessary to understand the context, explain it in the normal response text before the form. Keep the question and option labels inside the form plain text.
 

@@ -1,6 +1,19 @@
 // Radha
 import React, { useState } from 'react'; // Radha
+import katex from 'katex';
+import 'katex/dist/katex.min.css';
+import { MarkdownRenderer } from './markdowns/MarkdownRenderer';
 import './QuestionForm.css';
+
+function renderInlineLatex(text: string): string {
+  return text.replace(/\$\$(.+?)\$\$/g, (_, m) => {
+    try { return katex.renderToString(m.trim(), { displayMode: true, throwOnError: false }); }
+    catch { return `<code>$$${m}$$</code>`; }
+  }).replace(/\$(.+?)\$/g, (_, m) => {
+    try { return katex.renderToString(m.trim(), { displayMode: false, throwOnError: false }); }
+    catch { return `<code>$${m}$</code>`; }
+  });
+}
 
 interface QuestionFormProps {
   question: string;
@@ -34,7 +47,7 @@ export function QuestionForm({ question, options, onAnswer }: QuestionFormProps)
 
   return (
     <div className="question-form">
-      <div className="question-form-prompt">{question}</div>
+      <div className="question-form-prompt"><MarkdownRenderer content={question} /></div>
       <div className="question-form-options">
         {options.map((opt, i) => (
           <button
@@ -42,9 +55,8 @@ export function QuestionForm({ question, options, onAnswer }: QuestionFormProps)
             className={`question-form-option${selected === opt ? ' selected' : ''}`}
             onClick={() => handleOptionClick(opt)}
             disabled={selected !== null}
-          >
-            {opt}
-          </button>
+            dangerouslySetInnerHTML={{ __html: renderInlineLatex(opt) }}
+          />
         ))}
       </div>
       <div className="question-form-custom">

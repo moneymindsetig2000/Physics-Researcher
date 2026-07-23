@@ -68,10 +68,8 @@ export function WorkspaceHeader({
         >
           {isSummaryGenerating ? (
             <svg className="summary-spinner" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" strokeDasharray="50" strokeDashoffset="50">
-                <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="0.8s" repeatCount="indefinite" />
-                <animate attributeName="stroke-dashoffset" values="50;0;50" dur="1.2s" repeatCount="indefinite" />
-              </circle>
+              <circle cx="12" cy="12" r="10" strokeOpacity="0.2" />
+              <circle cx="12" cy="12" r="10" strokeDasharray="30 95" />
             </svg>
           ) : (
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

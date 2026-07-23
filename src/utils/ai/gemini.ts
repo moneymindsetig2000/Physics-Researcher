@@ -340,7 +340,8 @@ export async function runQueryPipelineStream(
     pendingThought = thought;
     if (!throttleTimeout) {
       throttleTimeout = setTimeout(() => {
-        onChunk({ text: pendingText, thought: pendingThought });
+        const parsed = parseQuestionFormXml(pendingText);
+        onChunk({ text: parsed.cleanText, thought: pendingThought, questionForm: parsed.questionForm ?? undefined });
         throttleTimeout = null;
       }, 35);
     }
@@ -632,21 +633,28 @@ function parseQuestionFormXml(text: string): {
   questionForm: { question: string; options: string[] } | null;
 } {
   const match = text.match(/<question_form>([\s\S]*?)<\/question_form>/i);
-  if (!match) return { cleanText: text, questionForm: null };
+  if (match) {
+    try {
+      const parsed = JSON.parse(match[1].trim());
+      if (parsed.question && Array.isArray(parsed.options) && parsed.options.length >= 2) {
+        const cleanText = text.replace(/<question_form>[\s\S]*?<\/question_form>/, "").trimEnd();
+        return {
+          cleanText,
+          questionForm: {
+            question: parsed.question,
+            options: parsed.options.slice(0, 4)
+          }
+        };
+      }
+    } catch {}
+  }
 
-  try {
-    const parsed = JSON.parse(match[1].trim());
-    if (parsed.question && Array.isArray(parsed.options) && parsed.options.length >= 2) {
-      const cleanText = text.replace(/<question_form>[\s\S]*?<\/question_form>/, "").trimEnd();
-      return {
-        cleanText,
-        questionForm: {
-          question: parsed.question,
-          options: parsed.options.slice(0, 4)
-        }
-      };
-    }
-  } catch {}
+  // Strip incomplete/in-progress <question_form> tag (still streaming)
+  const partialMatch = text.match(/<question_form>[\s\S]*$/i);
+  if (partialMatch) {
+    return { cleanText: text.slice(0, partialMatch.index).trimEnd(), questionForm: null };
+  }
+
   return { cleanText: text, questionForm: null };
 }
 
