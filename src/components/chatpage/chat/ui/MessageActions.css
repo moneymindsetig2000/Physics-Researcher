@@ -99,3 +99,8 @@
   color: #5e9eff;
   background: rgba(94, 158, 255, 0.08);
 }
+
+.ai-actions .action-btn > .tooltip {
+  width: auto;
+  white-space: nowrap;
+}

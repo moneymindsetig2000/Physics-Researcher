@@ -43,7 +43,7 @@ export async function generateSummary(
           config: {
             systemInstruction: SUMMARY_SYSTEM_ROLE,
             temperature: 0.3,
-            thinkingConfig: { thinkingLevel: 'HIGH' },
+            thinkingConfig: { thinkingLevel: 'MINIMAL' },
           },
         }),
       2,

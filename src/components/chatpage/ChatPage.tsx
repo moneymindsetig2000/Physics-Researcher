@@ -170,7 +170,8 @@ function ChatPage() { // Radha
   const handleSendPrompt = useCallback(async (
     promptText: string, 
     attachedImages?: string[],
-    attachedPdfs?: string[]
+    attachedPdfs?: string[],
+    thinkingMode?: 'instant' | 'thinking'
   ) => {
     if (!promptText.trim() && (!attachedImages || attachedImages.length === 0) && (!attachedPdfs || attachedPdfs.length === 0)) return;
 
@@ -272,7 +273,8 @@ function ChatPage() { // Radha
         chatHistory,
         parsedImages,
         parsedPdfs,
-        controller.signal
+        controller.signal,
+        thinkingMode === 'thinking' ? 'HIGH' : 'MINIMAL'
       );
 
       // Once streaming fully completes, attach final trace data and sync states

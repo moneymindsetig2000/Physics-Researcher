@@ -59,7 +59,7 @@ export function DashboardConfirmationModal({
 
         <div className="dashboard-modal-body">
           <p>
-            Are you sure you want to return to the dashboard?
+            Are you sure you want to exit the chat?
           </p>
           <p className="dashboard-modal-warning-text" style={{ fontSize: '0.8rem', color: 'rgba(255, 255, 255, 0.35)' }}>
             Any unsaved progress in the current conversation will be preserved in your chat history.

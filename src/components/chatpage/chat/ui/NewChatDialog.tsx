@@ -29,7 +29,7 @@ export function NewChatDialog({ isOpen, onContinueWithContext, onFreshStart, onD
             onClick={(e) => e.stopPropagation()}
           >
             <div className="new-chat-dialog-header">
-              <span className="new-chat-dialog-title">New Research Session</span>
+              <span className="new-chat-dialog-title">New Chat</span>
             </div>
             <div className="new-chat-dialog-body">
               <p className="new-chat-dialog-desc">

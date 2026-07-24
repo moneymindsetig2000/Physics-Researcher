@@ -240,7 +240,8 @@ export async function runQueryPipelineStream(
   chatHistory?: { sender: 'user' | 'ai'; text: string }[],
   images?: { mimeType: string; base64Data: string }[],
   pdfs?: { mimeType: string; base64Data: string }[],
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  thinkingLevel?: 'MINIMAL' | 'HIGH'
 ): Promise<PipelineResult> {
   const ai = getAIClient();
 
@@ -363,7 +364,7 @@ export async function runQueryPipelineStream(
       const config: any = {
         systemInstruction: { role: 'system', parts: [{ text: systemInstruction }] },
         ...(useSearchTool ? { tools: [{ googleSearch: {} }] } : {}),
-        thinkingConfig: { thinkingLevel: 'HIGH' }
+        thinkingConfig: { thinkingLevel: thinkingLevel ?? 'MINIMAL' }
       };
 
       const responseStream = await callWithRetry(() => createRawStream(
@@ -518,7 +519,7 @@ export async function runQueryPipelineStream(
     searchUsed,
     searchQueries,
     searchSources,
-    thinkingLevel: 'High',
+    thinkingLevel: thinkingLevel === 'HIGH' ? 'High' : 'Minimal',
     evalResult: {
       shouldSave: parsedXml.shouldSave,
       shouldDelete: parsedXml.shouldDelete,

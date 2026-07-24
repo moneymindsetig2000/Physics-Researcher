@@ -6,7 +6,7 @@ interface ComposerInputProps { // Radha
   // Radha
   message: string;
   onChange: (message: string) => void;
-  onSend: (attachedImages: string[], attachedPdfs: string[]) => void;
+  onSend: (attachedImages: string[], attachedPdfs: string[], thinkingMode?: 'instant' | 'thinking') => void;
   onImageClick?: (url: string) => void;
   isGenerating?: boolean;
   onStopGeneration?: () => void;
@@ -74,6 +74,8 @@ export function ComposerInput({
   const [attachedImages, setAttachedImages] = useState<string[]>([]);
   const [attachedPdfs, setAttachedPdfs] = useState<string[]>([]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [thinkingMode, setThinkingMode] = useState<'instant' | 'thinking'>('instant');
+  const [isThinkingSubmenuOpen, setIsThinkingSubmenuOpen] = useState(false);
 
   // Automatically adjust height on message changes
   useEffect(() => {
@@ -101,7 +103,7 @@ export function ComposerInput({
 
   const handleSendPrompt = () => {
     if (!message.trim() && attachedImages.length === 0 && attachedPdfs.length === 0) return;
-    onSend(attachedImages, attachedPdfs);
+    onSend(attachedImages, attachedPdfs, thinkingMode);
     setAttachedImages([]);
     setAttachedPdfs([]);
   };
@@ -195,6 +197,7 @@ export function ComposerInput({
     if (!isDropdownOpen) return;
     const handleOutsideClick = () => {
       setIsDropdownOpen(false);
+      setIsThinkingSubmenuOpen(false);
     };
     window.addEventListener('click', handleOutsideClick);
     return () => window.removeEventListener('click', handleOutsideClick);
@@ -313,11 +316,14 @@ export function ComposerInput({
                     className="dropdown-action-btn"
                     onClick={handleUploadClick}
                   >
-                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
                       <circle cx="12" cy="13" r="4"></circle>
                     </svg>
-                    <span>Upload Image</span>
+                    <div className="dropdown-item-content">
+                      <span className="dropdown-item-label">Upload Image</span>
+                      <span className="dropdown-item-desc">Attach a screenshot or diagram</span>
+                    </div>
                   </button>
                 </li>
                 <li className="dropdown-item">
@@ -331,12 +337,81 @@ export function ComposerInput({
                       setIsDropdownOpen(false);
                     }}
                   >
-                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                       <polyline points="14 2 14 8 20 8"></polyline>
                     </svg>
-                    <span>Upload PDF</span>
+                    <div className="dropdown-item-content">
+                      <span className="dropdown-item-label">Upload PDF</span>
+                      <span className="dropdown-item-desc">Attach a research paper or document</span>
+                    </div>
                   </button>
+                </li>
+                <li className="dropdown-item thinking-mode-item">
+                  <button 
+                    type="button" 
+                    className="dropdown-action-btn thinking-mode-trigger"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsThinkingSubmenuOpen(prev => !prev);
+                    }}
+                  >
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10"/>
+                      <polyline points="12 6 12 12 16 14"/>
+                    </svg>
+                    <div className="dropdown-item-content">
+                      <span className="dropdown-item-label">{thinkingMode === 'instant' ? 'Instant' : 'Thinking'}</span>
+                      <span className="dropdown-item-desc">{thinkingMode === 'instant' ? 'Get quick, light responses' : 'Deep reasoning before answering'}</span>
+                    </div>
+                    <svg className="chevron-right" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="9 18 15 12 9 6"/>
+                    </svg>
+                  </button>
+                  {isThinkingSubmenuOpen && (
+                    <div className="thinking-submenu">
+                      <button
+                        type="button"
+                        className={`thinking-submenu-item ${thinkingMode === 'instant' ? 'active' : ''}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setThinkingMode('instant');
+                          setIsThinkingSubmenuOpen(false);
+                          setIsDropdownOpen(false);
+                        }}
+                      >
+                        <div className="thinking-submenu-item-content">
+                          <span className="thinking-submenu-label">Instant (Default)</span>
+                          <span className="thinking-submenu-desc">Quick, light responses with minimal thinking</span>
+                        </div>
+                        {thinkingMode === 'instant' && (
+                          <svg className="check-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="20 6 9 17 4 12"/>
+                          </svg>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        className={`thinking-submenu-item ${thinkingMode === 'thinking' ? 'active' : ''}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setThinkingMode('thinking');
+                          setIsThinkingSubmenuOpen(false);
+                          setIsDropdownOpen(false);
+                        }}
+                      >
+                        <div className="thinking-submenu-item-content">
+                          <span className="thinking-submenu-label">Thinking</span>
+                          <span className="thinking-submenu-desc">Deep reasoning before answering, takes more time</span>
+                        </div>
+                        {thinkingMode === 'thinking' && (
+                          <svg className="check-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="20 6 9 17 4 12"/>
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                  )}
                 </li>
               </ul>
             </div>

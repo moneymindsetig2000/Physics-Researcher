@@ -42,7 +42,7 @@ interface ChatWorkspaceProps {
   isLeftSidebarCollapsed: boolean;
   onToggleLeftSidebar: () => void;
   activeChat: Chat | null;
-  onSendPrompt: (promptText: string, attachedImages?: string[], attachedPdfs?: string[]) => void;
+  onSendPrompt: (promptText: string, attachedImages?: string[], attachedPdfs?: string[], thinkingMode?: 'instant' | 'thinking') => void;
   onEditPrompt?: (userMsgId: string, newText: string, aiMsgId: string) => void;
   isGenerating?: boolean;
   onStopGeneration?: () => void;
@@ -63,7 +63,9 @@ const MessageItem = React.memo(({
   onVersionChange,
   totalVersions,
   allVersions,
-  onSendPrompt
+  onSendPrompt,
+  isLatestUserMessage,
+  onEditInComposer
 }: { 
   msg: Message;
   onImageClick?: (url: string) => void;
@@ -75,6 +77,8 @@ const MessageItem = React.memo(({
   totalVersions?: number;
   allVersions?: { text: string; responseText?: string; responseThought?: string }[];
   onSendPrompt?: (text: string) => void;
+  isLatestUserMessage?: boolean;
+  onEditInComposer?: (text: string) => void;
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState('');
@@ -204,6 +208,10 @@ const MessageItem = React.memo(({
     displayResponseThought.length >= ((msg.thought || '').length || 0);
 
   const handleEditStart = () => {
+    if (!isLatestUserMessage) {
+      onEditInComposer?.(displayText);
+      return;
+    }
     setEditText(displayText);
     setIsEditing(true);
     setTimeout(() => {
@@ -331,7 +339,7 @@ const MessageItem = React.memo(({
                   </button>
                 </div>
               )}
-              <MessageActions text={displayText} sender="user" onEdit={handleEditStart} />
+              <MessageActions text={displayText} sender="user" onEdit={handleEditStart} messageId={msg.id} />
             </div>
           )}
         </div>
@@ -376,9 +384,9 @@ const MessageItem = React.memo(({
               onAnswer={(answer) => onSendPrompt?.(answer)}
             />
           )}
-          {typewriterDone && !isGenerating && displayResponseText && (
+          {!isGenerating && displayResponseText && (
             <div className="ai-actions-row">
-              <MessageActions text={msg.text} sender="ai" contentRef={aiContentRef} />
+              <MessageActions text={msg.text} sender="ai" contentRef={aiContentRef} messageId={msg.id} />
               {totalVersions > 0 && (
                 <div className="version-switcher">
                   <button
@@ -546,6 +554,10 @@ export function ChatWorkspace({
     document.body.removeChild(link);
   };
 
+  const handleEditInComposer = (text: string) => {
+    setMessage(text);
+  };
+
   const handleClearTaggedText = () => {
     setTaggedText(null);
   };
@@ -570,13 +582,14 @@ export function ChatWorkspace({
 
   const handleSend = (
     attachedImages: string[],
-    attachedPdfs: string[]
+    attachedPdfs: string[],
+    thinkingMode?: 'instant' | 'thinking'
   ) => {
     if (!message.trim() && attachedImages.length === 0 && attachedPdfs.length === 0 && !taggedText) return;
     const finalMessage = taggedText
       ? `"${taggedText}"\n\n${message}`
       : message;
-    onSendPrompt(finalMessage, attachedImages, attachedPdfs);
+    onSendPrompt(finalMessage, attachedImages, attachedPdfs, thinkingMode);
     setMessage('');
     setTaggedText(null);
   };
@@ -621,6 +634,8 @@ export function ChatWorkspace({
                 ? (v: number) => handleVersionChange(userMsgForVersion!.id, v)
                 : undefined;
 
+              const lastUserMsgIdx = activeChat.messages.reduce((last, m, i) => m.sender === 'user' ? i : last, -1);
+
               return (
                 <React.Fragment key={msg.id}>
                   {showDivider && <ConversationDivider />}
@@ -635,6 +650,8 @@ export function ChatWorkspace({
                     totalVersions={totalVersions}
                     allVersions={allVersions}
                     onSendPrompt={(text) => onSendPrompt(text)}
+                    isLatestUserMessage={msg.sender === 'user' && idx === lastUserMsgIdx}
+                    onEditInComposer={handleEditInComposer}
                   />
                 </React.Fragment>
               );
